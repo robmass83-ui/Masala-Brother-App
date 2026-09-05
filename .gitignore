@@ -1,0 +1,31 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
+
+# Firebase / secrets
+frontend/lib/firebase_options.dart
+frontend/android/app/google-services.json
+frontend/ios/Runner/GoogleService-Info.plist
+frontend/android/key.properties
+*.jks
+*.keystore
+backend/.firebase/
+**/serviceAccount*.json
+
+# Node / misc
+node_modules/
+*.log
+.env
+.env.*
