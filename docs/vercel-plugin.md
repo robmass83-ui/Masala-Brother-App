@@ -46,4 +46,12 @@ L’MCP in `.cursor/mcp.json` punta a `https://mcp.vercel.com` (OAuth al primo c
 
 ## Preview web di questa app
 
-L’app è Flutter (`frontend/`), non Next.js. Per Vercel conviene pubblicare `frontend/build/web` già buildato, oppure collegare il repo e usare `vercel.json` in root come riferimento di build/output.
+L’app è Flutter (`frontend/`), non Next.js. Su Vercel il progetto Git deve usare `vercel.json` in root:
+
+- **Install:** `bash scripts/vercel-install.sh` (clona Flutter SDK)
+- **Build:** `bash scripts/vercel-build.sh`
+- **Output:** `frontend/build/web`
+- **Framework Preset:** Other
+
+Poi fai merge su `main` (o Redeploy) e apri `https://masala-brother-app.vercel.app`.
+Il primo build dura alcuni minuti (download Flutter).

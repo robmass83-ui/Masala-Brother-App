@@ -32,6 +32,21 @@ npx plugins add vercel/vercel-plugin --target cursor --scope project --yes
 In Cursor: `/add-plugin vercel`, poi ricarica la finestra.
 Dettagli: [`docs/vercel-plugin.md`](docs/vercel-plugin.md).
 
+### Preview web su Vercel
+
+Il progetto Vercel è collegato a GitHub. Su `main` devono esserci `vercel.json` + `scripts/vercel-*.sh` (questo PR).
+In Vercel → Project → Settings → Build & Development:
+
+| Setting | Valore |
+|---------|--------|
+| Framework Preset | Other |
+| Install Command | `bash scripts/vercel-install.sh` |
+| Build Command | `bash scripts/vercel-build.sh` |
+| Output Directory | `frontend/build/web` |
+| Root Directory | `.` (repo root) |
+
+Poi **Redeploy** da Deployments. URL: `https://masala-brother-app.vercel.app`
+
 ## Setup Firebase (Fase 2)
 
 1. Console Firebase → progetto di Roberto → **Authentication** → abilita **Google**.

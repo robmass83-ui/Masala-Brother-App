@@ -29,3 +29,6 @@ node_modules/
 *.log
 .env
 .env.*
+
+# Flutter SDK cloned by Vercel install script (local accidental clones)
+/flutter/

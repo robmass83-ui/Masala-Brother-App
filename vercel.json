@@ -1,7 +1,8 @@
 {
   "version": 2,
   "name": "masala-brother-app",
-  "buildCommand": "cd frontend && flutter pub get && flutter build web --release --dart-define=DEMO_AUTH=true",
+  "installCommand": "bash scripts/vercel-install.sh",
+  "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "frontend/build/web",
   "framework": null,
   "rewrites": [
