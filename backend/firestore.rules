@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberEmail() {
+      return signedIn()
+        && request.auth.token.email in
+          get(/databases/$(database)/documents/households/main).data.memberEmails;
+    }
+
+    match /households/{householdId} {
+      allow read: if memberEmail();
+      allow write: if memberEmail();
+
+      match /{subcollection}/{docId} {
+        allow read: if memberEmail();
+        allow create, update: if memberEmail();
+        // Soft-delete only — hard deletes are forbidden.
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

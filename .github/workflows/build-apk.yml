@@ -1,0 +1,31 @@
+name: Build release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      # Secrets (documentati in README): FIREBASE_OPTIONS, GOOGLE_SERVICES_JSON,
+      # KEYSTORE_BASE64, KEY_PROPERTIES — da aggiungere in Fase 9.
+      - name: Build APK (unsigned placeholder until secrets wired)
+        run: flutter build apk --debug
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: frontend/build/app/outputs/flutter-apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
