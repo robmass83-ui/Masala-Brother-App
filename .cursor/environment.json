@@ -1,0 +1,6 @@
+{
+  "name": "Masala Brother App",
+  "user": "ubuntu",
+  "install": "bash scripts/cloud-agent-install.sh",
+  "ports": [8000, 4000, 9099, 8085]
+}
