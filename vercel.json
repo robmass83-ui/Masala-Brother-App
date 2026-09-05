@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "name": "masala-brother-app",
+  "buildCommand": "cd frontend && flutter pub get && flutter build web --release --dart-define=DEMO_AUTH=true",
+  "outputDirectory": "frontend/build/web",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ]
+}
