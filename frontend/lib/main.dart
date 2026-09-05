@@ -4,20 +4,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_format.dart';
+import 'features/auth/auth_providers.dart';
+import 'features/auth/auth_repository.dart';
+import 'firebase_bootstrap.dart';
 import 'router/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppDateFormat.ensureInitialized();
-  runApp(const ProviderScope(child: MasalaBrotherApp()));
+  final boot = await bootstrapFirebase();
+  final demo = boot == FirebaseBootstrapResult.demo;
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        if (demo)
+          authRepositoryProvider.overrideWith((ref) {
+            final repo = AuthRepository(forceDemo: true);
+            ref.onDispose(repo.dispose);
+            return repo;
+          }),
+      ],
+      child: const MasalaBrotherApp(),
+    ),
+  );
 }
 
-class MasalaBrotherApp extends StatelessWidget {
+class MasalaBrotherApp extends ConsumerWidget {
   const MasalaBrotherApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final router = createAppRouter();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'Masala Brother App',
       debugShowCheckedModeBanner: false,

@@ -7,77 +7,106 @@ Sostituisce il file Excel su OneDrive. Distribuzione solo come APK (no Play Stor
 
 ```
 frontend/     # Flutter app (Android, minSdk 26) — UI + logica client
-backend/      # Firebase: rules, indexes, storage rules
+backend/      # Firebase: rules, indexes, storage rules + test emulator
 docs/         # design-reference.html, PROMPT-CURSOR.md, data-model.md
 ```
-
-> Nota: le cartelle si chiamano `frontend/` e `backend/` (richiesta esplicita).
-> Nel prompt originale erano `app/` e `firebase/` — stesso contenuto, nomi diversi.
 
 ## Prerequisiti
 
 - Flutter stable (3.24+)
 - Android SDK / JDK 17
 - Account Firebase di Roberto (Auth Google, Firestore `europe-west`)
+- Node.js 20+ (solo per test regole)
+
+## Setup Firebase (Fase 2)
+
+1. Console Firebase → progetto di Roberto → **Authentication** → abilita **Google**.
+2. Aggiungi app Android package `it.masala.brotherapp`.
+3. SHA-1/SHA-256 debug:
+   ```bash
+   keytool -list -v -alias androiddebugkey \
+     -keystore ~/.android/debug.keystore -storepass android -keypass android
+   ```
+4. Scarica `google-services.json` in `frontend/android/app/` (gitignored).
+5. Firestore in produzione, regione `europe-west`.
+6. Nel repo:
+   ```bash
+   cd frontend
+   dart pub global activate flutterfire_cli
+   flutterfire configure --project=<PROJECT_ID> --platforms=android
+   # Sostituisci i REPLACE_ME in lib/firebase_options.example.dart
+   # oppure genera lib/firebase_options.dart e aggiorna firebase_bootstrap.dart
+   ```
+7. Crea il documento `households/main` con:
+   ```json
+   {
+     "memberEmails": ["email.roberto@gmail.com", "email.laura@gmail.com"],
+     "members": {},
+     "enableAttachments": false
+   }
+   ```
+8. Deploy regole:
+   ```bash
+   cd backend
+   npx firebase deploy --only firestore:rules,firestore:indexes,storage
+   ```
+
+### Modalità demo (senza Firebase)
+
+Se `firebase_options` ha ancora `REPLACE_ME`, l’app parte in **DEMO_AUTH**:
+il pulsante “Entra con Google” simula Roberto e apre il Riepilogo.
+
+```bash
+cd frontend
+flutter run --dart-define=DEMO_AUTH=true
+```
 
 ## Setup frontend
 
 ```bash
 cd frontend
 flutter pub get
-# Configura Firebase (genera file gitignored):
-#   dart pub global activate flutterfire_cli
-#   flutterfire configure --project=<PROJECT_ID> --platforms=android
-# Copia l'esempio se serve solo per compilare senza Firebase reale:
-cp lib/firebase_options.example.dart lib/firebase_options.dart
 flutter analyze
 flutter test
-flutter run
+flutter run   # oppure flutter run -d chrome per preview web
 ```
 
-Package Android: `it.masala.brotherapp`
+### Secret da non commitare
 
-### Secret / file da non commitare
-
-- `frontend/lib/firebase_options.dart`
+- `frontend/lib/firebase_options.dart` (se generato)
 - `frontend/android/app/google-services.json`
 - `frontend/android/key.properties`, `*.jks` / `*.keystore`
 
-Vedi `.gitignore`.
-
-## Setup backend (Firebase)
+## Test regole Firestore
 
 ```bash
 cd backend
-firebase deploy --only firestore:rules,firestore:indexes,storage
+npm install
+npm run test:rules
 ```
 
-Regole: solo le email in `households/main.memberEmails` possono leggere/scrivere.
-Niente hard delete (soft delete con `deletedAt`).
+Verifica: membro ok, outsider negato, hard delete negato.
 
 ## Build APK release
 
 ```bash
 cd frontend
-# Crea keystore (una tantum) e key.properties (gitignored)
 flutter build apk --release --split-per-abi
 ```
 
-Installa l’APK sui due telefoni (origini sconosciute). Aggiornamenti: installa sopra; i dati stanno su Firebase.
-
 ## Fasi
 
-| Fase | Contenuto |
-|------|-----------|
-| 1 (questa PR) | Scheletro UI, temi, router, BalanceCalculator, backend rules, docs |
-| 2 | Firebase Auth Google + household |
-| 3 | Spese + Riepilogo |
-| 4 | Bonifici |
-| 5 | Cose da fare + notifiche |
-| 6 | Rendiconto / export |
-| 7 | Altro / rifiniture |
-| 8 | Import Excel |
-| 9 | Release CI + tag v1.0.0 |
+| Fase | Stato |
+|------|--------|
+| 1 Scheletro UI | fatto |
+| 2 Firebase + login | in corso / questa PR |
+| 3 Spese + Riepilogo | |
+| 4 Bonifici | |
+| 5 Cose da fare | |
+| 6 Rendiconto / export | |
+| 7 Altro / rifiniture | |
+| 8 Import Excel | |
+| 9 Release CI | |
 
 ## Design
 

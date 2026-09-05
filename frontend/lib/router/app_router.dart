@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/app_scaffold.dart';
+import '../features/auth/auth_models.dart';
+import '../features/auth/auth_providers.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/private_app_page.dart';
 import '../features/common/placeholder_page.dart';
@@ -20,10 +23,38 @@ import '../features/import_excel/import_excel_page.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createAppRouter({String initialLocation = '/login'}) {
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final authRefresh = _AuthRefresh(ref);
+  ref.onDispose(authRefresh.dispose);
+
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: initialLocation,
+    initialLocation: '/login',
+    refreshListenable: authRefresh,
+    redirect: (context, state) {
+      final auth = ref.read(authSessionProvider);
+      final loc = state.matchedLocation;
+
+      if (auth.isLoading || auth.isRefreshing) {
+        return null;
+      }
+
+      final session = auth.valueOrNull ?? const AuthSession.unknown();
+      final loggingIn = loc == '/login';
+      final privatePage = loc == '/privata';
+
+      switch (session.status) {
+        case AuthStatus.unknown:
+          return loggingIn ? null : '/login';
+        case AuthStatus.signedOut:
+          return loggingIn ? null : '/login';
+        case AuthStatus.unauthorized:
+          return privatePage ? null : '/privata';
+        case AuthStatus.authorized:
+          if (loggingIn || privatePage) return '/';
+          return null;
+      }
+    },
     routes: [
       GoRoute(
         path: '/login',
@@ -131,4 +162,19 @@ GoRouter createAppRouter({String initialLocation = '/login'}) {
       ),
     ],
   );
+});
+
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh(this.ref) {
+    _sub = ref.listen(authSessionProvider, (_, __) => notifyListeners());
+  }
+
+  final Ref ref;
+  late final ProviderSubscription<AsyncValue<AuthSession>> _sub;
+
+  @override
+  void dispose() {
+    _sub.close();
+    super.dispose();
+  }
 }
