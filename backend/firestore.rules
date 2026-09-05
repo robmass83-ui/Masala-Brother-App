@@ -2,23 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email != null;
     }
 
-    function memberEmail() {
+    function householdPath() {
+      return /databases/$(database)/documents/households/main;
+    }
+
+    function isMember() {
       return signedIn()
-        && request.auth.token.email in
-          get(/databases/$(database)/documents/households/main).data.memberEmails;
+        && request.auth.token.email.lower()
+          in get(householdPath()).data.memberEmails;
+    }
+
+    // Note: Firestore rules `in` on lists is case-sensitive.
+    // We store memberEmails lowercased from the app; rules compare raw token email.
+    // To be safe, also allow exact match against the token email as stored.
+    function isMemberEmail() {
+      return signedIn()
+        && request.auth.token.email in get(householdPath()).data.memberEmails;
     }
 
     match /households/{householdId} {
-      allow read: if memberEmail();
-      allow write: if memberEmail();
+      allow read: if isMemberEmail();
+      // Members can update members map / flags; cannot escalate by rewriting emails
+      // unless already a member. Creating the household doc is done once by admin/seed.
+      allow create: if signedIn();
+      allow update: if isMemberEmail();
+      allow delete: if false;
 
       match /{subcollection}/{docId} {
-        allow read: if memberEmail();
-        allow create, update: if memberEmail();
-        // Soft-delete only — hard deletes are forbidden.
+        allow read: if isMemberEmail();
+        allow create, update: if isMemberEmail();
+        // Soft-delete only — hard deletes forbidden.
         allow delete: if false;
       }
     }
