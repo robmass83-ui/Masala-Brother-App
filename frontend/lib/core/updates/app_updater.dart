@@ -116,6 +116,36 @@ class AppUpdater {
     return _compare(remote, local) > 0;
   }
 
+  /// True when GitHub has a newer APK than the installed app.
+  static bool hasNewerRelease(AppUpdate? latest, String currentVersion) {
+    if (latest == null) return false;
+    return isNewer(latest.version, currentVersion);
+  }
+
+  /// Show the in-app prompt unless the user already tapped “Non ora” for this version.
+  static bool shouldPrompt({
+    required AppUpdate? latest,
+    required String currentVersion,
+    String? dismissedVersion,
+  }) {
+    if (!hasNewerRelease(latest, currentVersion)) return false;
+    final version = latest!.version;
+    if (dismissedVersion == null || dismissedVersion.isEmpty) return true;
+    return stripVersionPrefix(dismissedVersion) != stripVersionPrefix(version);
+  }
+
+  /// Fire the Android notification once per version.
+  static bool shouldNotify({
+    required AppUpdate? latest,
+    required String currentVersion,
+    String? lastNotifiedVersion,
+  }) {
+    if (!hasNewerRelease(latest, currentVersion)) return false;
+    final version = latest!.version;
+    if (lastNotifiedVersion == null || lastNotifiedVersion.isEmpty) return true;
+    return stripVersionPrefix(lastNotifiedVersion) != stripVersionPrefix(version);
+  }
+
   static int _compare(String a, String b) {
     final pa = _parts(a);
     final pb = _parts(b);

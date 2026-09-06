@@ -8,12 +8,20 @@ import '../../data/task_models.dart';
 import '../../router/navigator_keys.dart';
 
 /// Local reminders at the configured hour (default 09:00 Europe/Rome). No FCM.
+/// Also posts a one-shot Android notification when a GitHub app update is ready.
 class TaskNotifications {
   TaskNotifications._();
 
+  static const updatePayload = 'app-update';
+  static const updateNotificationId = 71001;
+
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  static final Set<int> _scheduledTaskIds = <int>{};
   static bool _ready = false;
+
+  /// Set from the update probe so tapping the system notification opens the APK dialog.
+  static VoidCallback? onUpdateNotificationTap;
 
   static Future<void> ensureInitialized() async {
     if (kIsWeb || _ready) return;
@@ -35,7 +43,7 @@ class TaskNotifications {
       if (launch?.didNotificationLaunchApp == true &&
           payload != null &&
           payload.isNotEmpty) {
-        _openTask(payload);
+        _handlePayload(payload);
       }
     } catch (e, st) {
       debugPrint('TaskNotifications init: $e\n$st');
@@ -45,7 +53,21 @@ class TaskNotifications {
   static void _onTap(NotificationResponse response) {
     final id = response.payload;
     if (id == null || id.isEmpty) return;
-    _openTask(id);
+    _handlePayload(id);
+  }
+
+  static void _handlePayload(String payload) {
+    if (payload == updatePayload) {
+      _openUpdate();
+      return;
+    }
+    _openTask(payload);
+  }
+
+  static void _openUpdate() {
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      onUpdateNotificationTap?.call();
+    });
   }
 
   static void _openTask(String taskId) {
@@ -56,6 +78,39 @@ class TaskNotifications {
     });
   }
 
+  static Future<void> showUpdateAvailable(String version) async {
+    if (!_ready) return;
+    try {
+      await _plugin.show(
+        updateNotificationId,
+        'Aggiornamento disponibile',
+        'La versione $version è pronta. Tocca per installare.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'app_updates',
+            'Aggiornamenti app',
+            channelDescription:
+                'Avvisa quando c’è una nuova versione da installare',
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+          ),
+        ),
+        payload: updatePayload,
+      );
+    } catch (e, st) {
+      debugPrint('TaskNotifications update: $e\n$st');
+    }
+  }
+
+  static int _taskNotificationId(String taskId) {
+    var id = taskId.hashCode & 0x7fffffff;
+    if (id == updateNotificationId) {
+      id = (id + 1) & 0x7fffffff;
+    }
+    return id;
+  }
+
   static Future<void> sync({
     required List<HouseholdTask> tasks,
     required String currentUid,
@@ -63,7 +118,10 @@ class TaskNotifications {
   }) async {
     if (!_ready) return;
     try {
-      await _plugin.cancelAll();
+      for (final id in _scheduledTaskIds) {
+        await _plugin.cancel(id);
+      }
+      _scheduledTaskIds.clear();
       final loc = tz.getLocation('Europe/Rome');
       for (final task in tasks) {
         if (task.done || task.isDeleted) continue;
@@ -83,8 +141,9 @@ class TaskNotifications {
           when.hour,
         );
         if (!scheduled.isAfter(tz.TZDateTime.now(loc))) continue;
+        final id = _taskNotificationId(task.id);
         await _plugin.zonedSchedule(
-          task.id.hashCode & 0x7fffffff,
+          id,
           'Promemoria',
           task.title,
           scheduled,
@@ -100,6 +159,7 @@ class TaskNotifications {
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: task.id,
         );
+        _scheduledTaskIds.add(id);
       }
     } catch (e, st) {
       debugPrint('TaskNotifications sync: $e\n$st');

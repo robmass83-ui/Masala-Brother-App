@@ -11,6 +11,8 @@ import '../connectivity/connectivity_provider.dart';
 import '../notifications/task_notifications.dart';
 import '../prefs/settings_providers.dart';
 import '../theme/app_colors.dart';
+import '../updates/available_update_provider.dart';
+import '../updates/update_probe.dart';
 import 'offline_banner.dart';
 
 class AppScaffold extends ConsumerWidget {
@@ -195,8 +197,10 @@ class AppScaffold extends ConsumerWidget {
         }),
       );
     }
+    final availableUpdate = ref.watch(availableUpdateProvider);
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-    return BackButtonListener(
+    return UpdateProbe(
+      child: BackButtonListener(
       onBackButtonPressed: () async {
         final go = GoRouter.of(context);
         if (go.canPop()) {
@@ -252,6 +256,7 @@ class AppScaffold extends ConsumerWidget {
                     label: 'Altro',
                     selected: _index == 3,
                     icon: Icons.more_horiz,
+                    showBadge: availableUpdate != null,
                     onTap: () => _onTap(3),
                   ),
                 ],
@@ -259,6 +264,7 @@ class AppScaffold extends ConsumerWidget {
             ),
           ),
         ),
+      ),
       ),
     ),
     );
@@ -271,12 +277,14 @@ class _NavItem extends StatelessWidget {
     required this.selected,
     required this.icon,
     required this.onTap,
+    this.showBadge = false,
   });
 
   final String label;
   final bool selected;
   final IconData icon;
   final VoidCallback onTap;
+  final bool showBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +303,29 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 24),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(icon, color: color, size: 24),
+                    if (showBadge)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: c.acc,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 3),
               ExcludeSemantics(
                 child: Text(

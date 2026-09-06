@@ -25,6 +25,11 @@ class AppDateFormat {
     return DateFormat('MMMM yyyy', 'it_IT').format(date).toUpperCase();
   }
 
+  /// Full Italian weekday: `lunedì`.
+  static String weekday(DateTime date) {
+    return DateFormat('EEEE', 'it_IT').format(date);
+  }
+
   static String formatTime(DateTime date) {
     return DateFormat('HH:mm', 'it_IT').format(date);
   }

@@ -19,16 +19,24 @@ void main() {
     expect(prefs.reminderHour, 7);
     await prefs.setReminderHour(30);
     expect(prefs.reminderHour, 23);
+    await prefs.setLastNotifiedUpdateVersion('1.0.2');
+    await prefs.setDismissedUpdateVersion('1.0.2');
+    expect(prefs.lastNotifiedUpdateVersion, '1.0.2');
+    expect(prefs.dismissedUpdateVersion, '1.0.2');
   });
 
   test('AppPrefs.load reads SharedPreferences', () async {
     SharedPreferences.setMockInitialValues({
       'theme_mode': 'light',
       'reminder_hour': 8,
+      'last_notified_update_version': '1.0.3',
+      'dismissed_update_version': '1.0.3',
     });
     final prefs = await AppPrefs.load();
     expect(prefs.themeMode, ThemeMode.light);
     expect(prefs.reminderHour, 8);
+    expect(prefs.lastNotifiedUpdateVersion, '1.0.3');
+    expect(prefs.dismissedUpdateVersion, '1.0.3');
   });
 
   test('AppDateFormat.relative uses Italian short forms', () async {

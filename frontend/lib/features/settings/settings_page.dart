@@ -6,6 +6,7 @@ import '../../core/config/app_config.dart';
 import '../../core/connectivity/connectivity_provider.dart';
 import '../../core/prefs/settings_providers.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/updates/available_update_provider.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/person_avatar.dart';
@@ -43,6 +44,7 @@ class SettingsPage extends ConsumerWidget {
     final lastAt = _lastUpdateAt(ref);
     final theme = ref.watch(themeModeProvider);
     final hour = ref.watch(reminderHourProvider);
+    final availableUpdate = ref.watch(availableUpdateProvider);
     final cats = ref.watch(categoriesProvider).valueOrNull ?? const <CatalogCategory>[];
     final props =
         ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[];
@@ -215,7 +217,9 @@ class SettingsPage extends ConsumerWidget {
               SettingsTile(
                 leading: const SettingsIcon(Icons.system_update_alt),
                 title: 'Controlla aggiornamenti',
-                subtitle: 'Scarica e installa se c’è una versione nuova',
+                subtitle: availableUpdate == null
+                    ? 'Scarica e installa se c’è una versione nuova'
+                    : 'Versione ${availableUpdate.version} disponibile',
                 onTap: () => checkAppUpdates(context),
               ),
             ],

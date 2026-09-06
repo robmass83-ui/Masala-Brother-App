@@ -10,17 +10,22 @@ class EmptyState extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
+    this.compact = false,
   });
 
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final label = actionLabel;
     return AppCard(
+      padding: compact
+          ? const EdgeInsets.fromLTRB(14, 8, 14, 8)
+          : const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -29,12 +34,35 @@ class EmptyState extends StatelessWidget {
             style: TextStyle(
               color: c.ink2,
               fontWeight: FontWeight.w600,
-              height: 1.4,
+              height: compact ? 1.25 : 1.4,
             ),
           ),
           if (label != null && onAction != null) ...[
-            const SizedBox(height: 16),
-            PrimaryButton(label: label, onPressed: onAction),
+            SizedBox(height: compact ? 6 : 16),
+            if (compact)
+              SizedBox(
+                height: 38,
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.acc,
+                    foregroundColor: c.onAcc,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: Text(label),
+                ),
+              )
+            else
+              PrimaryButton(label: label, onPressed: onAction),
           ],
         ],
       ),

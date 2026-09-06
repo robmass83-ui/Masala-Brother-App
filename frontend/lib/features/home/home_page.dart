@@ -26,7 +26,6 @@ class HomePage extends ConsumerWidget {
     final c = context.colors;
     final session = ref.watch(authSessionProvider).valueOrNull;
     final user = session?.user;
-    final household = session?.household;
     final balance = ref.watch(balanceProvider);
     final expenses = ref.watch(expensesProvider).valueOrNull ?? const <Expense>[];
     final tasks = ref.watch(visibleTasksProvider);
@@ -34,14 +33,17 @@ class HomePage extends ConsumerWidget {
       for (final cat in ref.watch(categoriesProvider).valueOrNull ?? const <CatalogCategory>[])
         cat.id: cat.name,
     };
-
     final firstName = (user?.displayName ?? 'ciao').split(' ').first;
     final toFix = daSistemareItems(expenses: expenses, tasks: tasks);
 
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(
-        title: Text('Ciao $firstName'),
+        toolbarHeight: 48,
+        title: Text(
+          'Ciao $firstName',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
         actions: [
           IconButton(
             tooltip: 'Cose in scadenza',
@@ -51,90 +53,24 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+        physics: const ClampingScrollPhysics(),
         children: [
           _HeroBalance(colors: c, snap: balance),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _PaidCard(
-                  person: PersonKey.rob,
-                  label: 'Roberto ha pagato',
-                  cents: balance.paidRobCents,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _PaidCard(
-                  person: PersonKey.lau,
-                  label: 'Laura ha pagato',
-                  cents: balance.paidLauCents,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            onTap: () => context.push('/rendiconto'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Spese totali',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: c.ink2,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _SoftArrowHint(),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                MoneyText(balance.totalDueCents, style: const TextStyle(fontSize: 22)),
-                const SizedBox(height: 4),
-                Text(
-                  'Metà a testa ${MoneyFormat.fromCents(balance.halfEachCents)}',
-                  style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                _ShareBar(robShare: balance.robPaidShare),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Text(
-                'Da sistemare',
-                style: TextStyle(
-                  color: c.ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => context.go('/spese'),
-                child: Text('Vedi tutte', style: TextStyle(color: c.acc)),
-              ),
-            ],
-          ),
+          const SizedBox(height: 6),
+          _PaidRow(paidRob: balance.paidRobCents, paidLau: balance.paidLauCents),
+          const SizedBox(height: 6),
+          _TotalsCard(balance: balance),
+          const SizedBox(height: 6),
           if (toFix.isEmpty)
             EmptyState(
               message: 'Niente in sospeso. Siete a posto.',
               actionLabel: 'Nuova spesa',
+              compact: true,
               onAction: () => context.push('/spese/nuova'),
             )
-          else
+          else ...[
+            _DaSistemareHeader(),
             for (final item in toFix) ...[
               if (item.expense != null)
                 _OpenExpenseCard(
@@ -144,11 +80,122 @@ class HomePage extends ConsumerWidget {
                 )
               else if (item.task != null)
                 _OpenTaskCard(task: item.task!),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
             ],
-          if (household != null) const SizedBox(height: 4),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _PaidRow extends StatelessWidget {
+  const _PaidRow({required this.paidRob, required this.paidLau});
+
+  final int paidRob;
+  final int paidLau;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _PaidCard(
+            person: PersonKey.rob,
+            label: 'Roberto ha pagato',
+            cents: paidRob,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _PaidCard(
+            person: PersonKey.lau,
+            label: 'Laura ha pagato',
+            cents: paidLau,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TotalsCard extends StatelessWidget {
+  const _TotalsCard({required this.balance});
+
+  final BalanceSnapshot balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      onTap: () => context.push('/rendiconto'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Spese totali',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: c.ink2,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SoftArrowHint(),
+            ],
+          ),
+          const SizedBox(height: 2),
+          MoneyText(balance.totalDueCents, style: const TextStyle(fontSize: 18)),
+          const SizedBox(height: 2),
+          Text(
+            'Metà a testa ${MoneyFormat.fromCents(balance.halfEachCents)}',
+            style: TextStyle(
+              color: c.ink2,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _ShareBar(robShare: balance.robPaidShare),
+        ],
+      ),
+    );
+  }
+}
+
+class _DaSistemareHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Row(
+      children: [
+        Text(
+          'Da sistemare',
+          style: TextStyle(
+            color: c.ink,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: () => context.go('/spese'),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+          ),
+          child: Text('Vedi tutte', style: TextStyle(color: c.acc)),
+        ),
+      ],
     );
   }
 }
@@ -288,7 +335,7 @@ class _HeroBalance extends StatelessWidget {
     final even = snap.isEven;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
         color: colors.hero,
         borderRadius: BorderRadius.circular(22),
@@ -299,30 +346,28 @@ class _HeroBalance extends StatelessWidget {
           Text(
             'SITUAZIONE ATTUALE',
             style: TextStyle(
-              color: colors.heroMuted,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
+              fontSize: 12,
               letterSpacing: 0.04,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Text(
             even ? 'Siete in pari' : MoneyFormat.fromCents(snap.absoluteCreditCents),
             style: TextStyle(
               color: colors.heroFg,
-              fontSize: 38,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               height: 1,
               letterSpacing: -0.02,
             ),
           ),
           if (!even) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text.rich(
               TextSpan(
                 style: TextStyle(
                   color: colors.heroFg,
-                  fontSize: 17,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
                 children: snap.lauraOwesRoberto
@@ -365,13 +410,16 @@ class _HeroBalance extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
           FilledButton(
             onPressed: () => context.push('/bonifici/nuovo'),
             style: FilledButton.styleFrom(
               backgroundColor: colors.acc,
               foregroundColor: colors.onAcc,
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(38),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(vertical: 6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -402,14 +450,14 @@ class _PaidCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              PersonAvatar(person: person, size: 28),
-              const SizedBox(width: 8),
+              PersonAvatar(person: person, size: 22),
+              const SizedBox(width: 6),
               Flexible(
                 child: Text(
                   label,
@@ -418,14 +466,14 @@ class _PaidCard extends StatelessWidget {
                   style: TextStyle(
                     color: c.ink2,
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          MoneyText(cents, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 4),
+          MoneyText(cents, style: const TextStyle(fontSize: 16)),
         ],
       ),
     );
@@ -437,8 +485,8 @@ class _SoftArrowHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      width: 40,
-      height: 40,
+      width: 28,
+      height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: c.accSoft,
@@ -464,7 +512,7 @@ class _ShareBar extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(99),
           child: SizedBox(
-            height: 10,
+            height: 6,
             child: Row(
               children: [
                 Expanded(flex: (rob * 1000).round().clamp(0, 1000), child: ColoredBox(color: c.rob)),
@@ -476,7 +524,7 @@ class _ShareBar extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           children: [
             Text(

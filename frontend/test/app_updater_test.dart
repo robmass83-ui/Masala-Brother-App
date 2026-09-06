@@ -43,4 +43,63 @@ void main() {
     expect(update?.apkUrl, 'https://example.com/app.apk');
     expect(update?.notes, 'Fix login');
   });
+
+  test('hasNewerRelease and prompt/notify flags', () {
+    const latest = AppUpdate(
+      tag: 'v1.0.2',
+      version: '1.0.2',
+      apkUrl: 'https://example.com/app.apk',
+      apkName: 'app.apk',
+    );
+    expect(AppUpdater.hasNewerRelease(latest, '1.0.1'), isTrue);
+    expect(AppUpdater.hasNewerRelease(latest, '1.0.2'), isFalse);
+    expect(AppUpdater.hasNewerRelease(null, '1.0.1'), isFalse);
+
+    expect(
+      AppUpdater.shouldPrompt(
+        latest: latest,
+        currentVersion: '1.0.1',
+      ),
+      isTrue,
+    );
+    expect(
+      AppUpdater.shouldPrompt(
+        latest: latest,
+        currentVersion: '1.0.1',
+        dismissedVersion: '1.0.2',
+      ),
+      isFalse,
+    );
+    expect(
+      AppUpdater.shouldPrompt(
+        latest: latest,
+        currentVersion: '1.0.1',
+        dismissedVersion: 'v1.0.2',
+      ),
+      isFalse,
+    );
+    expect(
+      AppUpdater.shouldNotify(
+        latest: latest,
+        currentVersion: '1.0.1',
+      ),
+      isTrue,
+    );
+    expect(
+      AppUpdater.shouldNotify(
+        latest: latest,
+        currentVersion: '1.0.1',
+        lastNotifiedVersion: '1.0.2',
+      ),
+      isFalse,
+    );
+    expect(
+      AppUpdater.shouldNotify(
+        latest: latest,
+        currentVersion: '1.0.1',
+        lastNotifiedVersion: '1.0.1',
+      ),
+      isTrue,
+    );
+  });
 }

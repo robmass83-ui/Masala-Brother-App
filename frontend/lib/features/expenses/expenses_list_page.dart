@@ -7,7 +7,6 @@ import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/money_text.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/status_mapping.dart';
@@ -50,9 +49,13 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
       for (final x in ref.watch(categoriesProvider).valueOrNull ?? const <CatalogCategory>[])
         x.id: x.name,
     };
+    final catalogProperties =
+        ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[];
     final props = {
-      for (final x in ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[])
-        x.id: x.shortName,
+      for (final x in catalogProperties) x.id: x.name,
+    };
+    final propertiesById = {
+      for (final x in catalogProperties) x.id: x,
     };
     final household = ref.watch(authSessionProvider).valueOrNull?.household;
     final user = ref.watch(authSessionProvider).valueOrNull?.user;
@@ -84,11 +87,7 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
       return hay.contains(q);
     }).toList();
 
-    final groups = <String, List<Expense>>{};
-    for (final e in filtered) {
-      final key = AppDateFormat.monthYearHeader(e.date);
-      groups.putIfAbsent(key, () => []).add(e);
-    }
+    final groups = _groupByMonthAndDay(filtered);
 
     int count(ExpenseStatus s) => expenses.where((e) => e.status == s).length;
 
@@ -182,7 +181,7 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
           Expanded(
             child: filtered.isEmpty
                 ? ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 72),
                     children: [
                       EmptyState(
                         message: expenses.isEmpty
@@ -194,46 +193,46 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
                     ],
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 72),
                     itemCount: groups.length,
                     itemBuilder: (context, i) {
-                      final month = groups.keys.elementAt(i);
-                      final items = groups[month]!;
-                      final monthTotal =
-                          items.fold<int>(0, (s, e) => s + e.amountDueCents);
+                      final month = groups[i];
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+                            padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
                             child: Text(
-                              '$month · ${MoneyFormat.fromCents(monthTotal)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              month.header,
                               style: TextStyle(
                                 color: c.ink3,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 13,
+                                fontSize: 12,
+                                height: 1.2,
                               ),
                             ),
                           ),
-                          for (final e in items)
-                            _ExpenseTile(
-                              expense: e,
-                              category: cats[e.categoryId],
-                              property: e.propertyId == null
-                                  ? null
-                                  : props[e.propertyId],
-                              robUid: household?.robUid ?? 'rob',
-                              lauUid: household?.lauUid ?? 'lau',
-                              onOpen: () => context.push('/spese/${e.id}'),
-                              onDelete: household == null || user == null
-                                  ? null
-                                  : () => _delete(e, user.uid),
-                              onMarkPaid: household == null || user == null
-                                  ? null
-                                  : () => _markPaid(e, household, user.uid),
-                            ),
+                          for (final day in month.days) ...[
+                            _DayHeader(date: day.date),
+                            for (final e in day.items)
+                              _ExpenseTile(
+                                expense: e,
+                                category: cats[e.categoryId],
+                                property: e.propertyId == null
+                                    ? null
+                                    : _propertyChipLabel(
+                                        propertiesById[e.propertyId],
+                                        fallback: props[e.propertyId],
+                                      ),
+                                onOpen: () => context.push('/spese/${e.id}'),
+                                onDelete: household == null || user == null
+                                    ? null
+                                    : () => _delete(e, user.uid),
+                                onMarkPaid: household == null || user == null
+                                    ? null
+                                    : () => _markPaid(e, household, user.uid),
+                              ),
+                          ],
                         ],
                       );
                     },
@@ -268,6 +267,49 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
       lauUid: household.lauUid,
     );
   }
+}
+
+List<_MonthSection> _groupByMonthAndDay(List<Expense> expenses) {
+  final months = <String, _MonthSection>{};
+  for (final e in expenses) {
+    final header = AppDateFormat.monthYearHeader(e.date);
+    final month = months.putIfAbsent(header, () => _MonthSection(header: header));
+    final dayStamp = DateTime(e.date.year, e.date.month, e.date.day);
+    final dayKey = dayStamp.millisecondsSinceEpoch.toString();
+    final day = month.daysByKey.putIfAbsent(
+      dayKey,
+      () => _DaySection(date: dayStamp),
+    );
+    day.items.add(e);
+  }
+  return months.values.toList();
+}
+
+String? _propertyChipLabel(CatalogProperty? property, {String? fallback}) {
+  if (property == null) return fallback;
+  final short = property.shortName.trim();
+  final number = property.houseNumber.trim();
+  if (short.isNotEmpty && number.isNotEmpty) return '$short $number';
+  final name = property.name.trim();
+  if (name.isNotEmpty) return name;
+  if (short.isNotEmpty) return short;
+  return fallback;
+}
+
+class _MonthSection {
+  _MonthSection({required this.header});
+
+  final String header;
+  final daysByKey = <String, _DaySection>{};
+
+  List<_DaySection> get days => daysByKey.values.toList();
+}
+
+class _DaySection {
+  _DaySection({required this.date});
+
+  final DateTime date;
+  final items = <Expense>[];
 }
 
 class _Chip extends StatelessWidget {
@@ -330,13 +372,54 @@ class _Chip extends StatelessWidget {
   }
 }
 
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '${date.day}',
+            style: TextStyle(
+              color: c.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              height: 1,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 1),
+              child: Text(
+                AppDateFormat.weekday(date),
+                style: TextStyle(
+                  color: c.ink2,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
     required this.category,
     required this.property,
-    required this.robUid,
-    required this.lauUid,
     required this.onOpen,
     required this.onDelete,
     required this.onMarkPaid,
@@ -345,8 +428,6 @@ class _ExpenseTile extends StatelessWidget {
   final Expense expense;
   final String? category;
   final String? property;
-  final String robUid;
-  final String lauUid;
   final VoidCallback onOpen;
   final VoidCallback? onDelete;
   final VoidCallback? onMarkPaid;
@@ -356,15 +437,22 @@ class _ExpenseTile extends StatelessWidget {
     final c = context.colors;
     final robPaid = expense.paidRobCents > 0;
     final lauPaid = expense.paidLauCents > 0;
-    final subtitle = [
-      AppDateFormat.format(expense.date),
-      if (expense.dateEstimated) 'data stimata',
-      if (category != null) category,
-      if (property != null) property,
-    ].join(' · ');
+    final facts = <Widget>[
+      _FactChip(
+        icon: Icons.event_outlined,
+        label: [
+          AppDateFormat.format(expense.date),
+          if (expense.dateEstimated) 'data stimata',
+        ].join(' · '),
+      ),
+      if (property != null && property!.trim().isNotEmpty)
+        _FactChip(icon: Icons.home_outlined, label: property!),
+      if (category != null && category!.trim().isNotEmpty)
+        _FactChip(icon: Icons.label_outline, label: category!),
+    ];
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Dismissible(
         key: ValueKey(expense.id),
         background: _SwipeBg(
@@ -406,62 +494,131 @@ class _ExpenseTile extends StatelessWidget {
         },
         child: AppCard(
           onTap: onOpen,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _PayerAvatars(rob: robPaid, lau: lauPaid),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      expense.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.ink,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        height: 1.2,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            expense.description,
+                            style: TextStyle(
+                              color: c.ink,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          MoneyFormat.fromCents(expense.amountDueCents),
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            color: c.ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25,
+                            letterSpacing: -0.01,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.ink2,
-                        fontSize: 12,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: facts,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            StatusChip(
+                              status: statusToUi(expense.status),
+                              compact: true,
+                            ),
+                            if (expense.status != ExpenseStatus.pagato &&
+                                expense.missingCents > 0) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Manca ${MoneyFormat.fromCents(expense.missingCents)}',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  color: c.due,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.15,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  MoneyText(
-                    expense.amountDueCents,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  StatusChip(
-                    status: statusToUi(expense.status),
-                    compact: true,
-                  ),
-                ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FactChip extends StatelessWidget {
+  const _FactChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width - 88,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 3, 7, 3),
+        decoration: BoxDecoration(
+          color: c.bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: c.line),
+        ),
+        child: Text.rich(
+          TextSpan(
+            style: TextStyle(
+              color: c.ink2,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
+            children: [
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(icon, size: 12, color: c.ink2),
+                ),
               ),
+              TextSpan(text: label),
             ],
           ),
         ),
@@ -479,18 +636,18 @@ class _PayerAvatars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!rob && !lau) {
-      return const PersonAvatar(empty: true, size: 32);
+      return const PersonAvatar(empty: true, size: 28);
     }
     if (rob && lau) {
       return const SizedBox(
-        width: 44,
-        height: 32,
+        width: 38,
+        height: 28,
         child: Stack(
           children: [
-            PersonAvatar(person: PersonKey.rob, size: 32),
+            PersonAvatar(person: PersonKey.rob, size: 28),
             Positioned(
-              left: 12,
-              child: PersonAvatar(person: PersonKey.lau, size: 32),
+              left: 10,
+              child: PersonAvatar(person: PersonKey.lau, size: 28),
             ),
           ],
         ),
@@ -498,7 +655,7 @@ class _PayerAvatars extends StatelessWidget {
     }
     return PersonAvatar(
       person: rob ? PersonKey.rob : PersonKey.lau,
-      size: 32,
+      size: 28,
     );
   }
 }

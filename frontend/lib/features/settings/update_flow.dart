@@ -34,7 +34,16 @@ Future<void> checkAppUpdates(BuildContext context) async {
     return;
   }
 
-  final available = latest;
+  await offerAvailableUpdate(context, latest);
+}
+
+/// Dialog already used from Altro, the startup prompt, and the system notification tap.
+///
+/// Returns `true` if the user started the download.
+Future<bool> offerAvailableUpdate(
+  BuildContext context,
+  AppUpdate latest,
+) async {
   final go = await showDialog<bool>(
     context: context,
     builder: (ctx) {
@@ -42,7 +51,7 @@ Future<void> checkAppUpdates(BuildContext context) async {
       return AlertDialog(
         backgroundColor: c.card,
         title: Text(
-          'Versione ${available.version} disponibile',
+          'Versione ${latest.version} disponibile',
           style: TextStyle(color: c.ink, fontWeight: FontWeight.w800),
         ),
         content: Text(
@@ -63,9 +72,10 @@ Future<void> checkAppUpdates(BuildContext context) async {
       );
     },
   );
-  if (go != true || !context.mounted) return;
+  if (go != true || !context.mounted) return false;
 
-  await _downloadAndInstall(context, updater, available);
+  await _downloadAndInstall(context, AppUpdater(), latest);
+  return true;
 }
 
 Future<void> _downloadAndInstall(

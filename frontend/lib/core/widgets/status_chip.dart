@@ -24,8 +24,11 @@ class StatusChip extends StatelessWidget {
     };
 
     return Container(
-      height: compact ? 20 : 26,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
+      height: compact ? null : 26,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 10,
+        vertical: compact ? 3 : 0,
+      ),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bg,
@@ -35,9 +38,9 @@ class StatusChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: fg,
-          fontSize: compact ? 11 : 13,
+          fontSize: compact ? 10 : 13,
           fontWeight: FontWeight.w700,
-          height: 1,
+          height: compact ? 1.1 : 1,
         ),
       ),
     );
