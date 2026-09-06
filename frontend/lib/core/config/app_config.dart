@@ -21,8 +21,8 @@ class AppConfig {
   ];
 
   /// Keep in sync with `pubspec.yaml` `version:`.
-  static const String appVersion = '1.0.4';
-  static const int appBuild = 7;
+  static const String appVersion = '1.0.5';
+  static const int appBuild = 8;
 
   static const String githubOwner = 'robmass83-ui';
   static const String githubRepo = 'Masala-Brother-App';

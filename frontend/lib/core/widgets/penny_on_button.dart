@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'penny_thoughts.dart';
 
-/// Penny appoggiata al bottone, con nuvoletta che nasce dalla testa.
+/// Penny appoggiata al bottone, con nuvoletta tutta visibile e testo dentro.
 class PennyOnButton extends StatefulWidget {
   const PennyOnButton({super.key});
 
@@ -15,32 +15,26 @@ class PennyOnButton extends StatefulWidget {
 class _PennyOnButtonState extends State<PennyOnButton>
     with TickerProviderStateMixin {
   late final AnimationController _idle;
-  late final AnimationController _bubble;
-  final _rng = math.Random();
-  late String _phrase;
-  String? _lastPhrase;
-  bool _readyForNext = true;
+  late final AnimationController _enter;
 
   @override
   void initState() {
     super.initState();
-    _phrase = _nextPhrase();
     _idle = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     );
-    _bubble = AnimationController(
+    _enter = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5600),
+      duration: const Duration(milliseconds: 700),
     );
-    _bubble.addListener(_maybePickPhrase);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_canLoop) {
         _idle.repeat(reverse: true);
-        _bubble.repeat();
+        _enter.forward();
       } else {
-        _bubble.value = 0.5;
+        _enter.value = 1;
       }
     });
   }
@@ -52,62 +46,37 @@ class _PennyOnButtonState extends State<PennyOnButton>
         .contains('TestWidgetsFlutterBinding');
   }
 
-  void _maybePickPhrase() {
-    if (_bubble.value < 0.04) {
-      _readyForNext = true;
-      return;
-    }
-    if (_readyForNext && _bubble.value >= 0.04) {
-      _readyForNext = false;
-      final next = _nextPhrase();
-      if (next != _phrase) setState(() => _phrase = next);
-    }
-  }
-
-  String _nextPhrase() {
-    String pick;
-    do {
-      pick = pennyThoughts[_rng.nextInt(pennyThoughts.length)];
-    } while (pick == _lastPhrase && pennyThoughts.length > 1);
-    _lastPhrase = pick;
-    return pick;
-  }
-
   @override
   void dispose() {
-    _bubble.removeListener(_maybePickPhrase);
     _idle.dispose();
-    _bubble.dispose();
+    _enter.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const bubbleW = 158.0;
+    const bubbleH = 104.0;
     return AnimatedBuilder(
-      animation: Listenable.merge([_idle, _bubble]),
+      animation: Listenable.merge([_idle, _enter]),
       builder: (context, _) {
-        final t = _bubble.value;
-        final pop = _pop(t);
-        final opacity = _opacity(t);
-        final textIn = _textIn(t);
-        final bob = math.sin(_idle.value * math.pi) * 2.2;
-        final float = math.sin(t * math.pi * 2) * 2.0 * textIn;
-
+        final bob = math.sin(_idle.value * math.pi) * 2.0;
+        final enter = Curves.easeOutBack.transform(_enter.value).clamp(0.0, 1.0);
         return SizedBox(
-          width: 168,
-          height: 118,
+          width: 188,
+          height: 150,
           child: Stack(
-            clipBehavior: Clip.none,
+            clipBehavior: Clip.hardEdge,
             children: [
               Positioned(
-                right: 2,
+                right: 0,
                 bottom: 0,
                 child: Transform.translate(
                   offset: Offset(0, -bob),
                   child: Image.asset(
                     'assets/mascot/penny.png',
-                    width: 78,
-                    height: 78,
+                    width: 72,
+                    height: 72,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
                     semanticLabel: 'Penny',
@@ -115,47 +84,47 @@ class _PennyOnButtonState extends State<PennyOnButton>
                 ),
               ),
               Positioned(
-                right: 52,
-                bottom: 46,
+                right: 44,
+                top: 0,
+                width: bubbleW,
+                height: bubbleH,
                 child: Opacity(
-                  opacity: opacity,
-                  child: Transform.translate(
-                    offset: Offset(0, -float),
-                    child: Transform.scale(
-                      scale: pop,
-                      alignment: const Alignment(0.72, 1.05),
-                      child: SizedBox(
-                        width: 118,
-                        height: 78,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Image.asset(
-                              'assets/mascot/nuvoletta.png',
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
-                              child: Opacity(
-                                opacity: textIn,
+                  opacity: _enter.value.clamp(0.0, 1.0),
+                  child: Transform.scale(
+                    scale: 0.84 + enter * 0.16,
+                    alignment: const Alignment(0.65, 1.0),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          'assets/mascot/nuvoletta.png',
+                          fit: BoxFit.contain,
+                          alignment: Alignment.topCenter,
+                          filterQuality: FilterQuality.high,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(28, 20, 28, 38),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 96),
                                 child: Text(
-                                  _phrase,
+                                  PennySession.phrase,
                                   textAlign: TextAlign.center,
                                   maxLines: 4,
-                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: Color(0xFF16181D),
-                                    fontSize: 9.5,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w800,
-                                    height: 1.2,
+                                    height: 1.15,
                                   ),
                                 ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -165,29 +134,5 @@ class _PennyOnButtonState extends State<PennyOnButton>
         );
       },
     );
-  }
-
-  static double _pop(double t) {
-    if (t < 0.08) return 0;
-    if (t < 0.28) {
-      final p = (t - 0.08) / 0.20;
-      return Curves.elasticOut.transform(p).clamp(0.0, 1.08);
-    }
-    if (t < 0.82) return 1;
-    return Curves.easeIn.transform((1 - t) / 0.18).clamp(0.0, 1.0);
-  }
-
-  static double _opacity(double t) {
-    if (t < 0.06) return 0;
-    if (t < 0.16) return (t - 0.06) / 0.10;
-    if (t < 0.82) return 1;
-    return ((1 - t) / 0.18).clamp(0.0, 1.0);
-  }
-
-  static double _textIn(double t) {
-    if (t < 0.22) return 0;
-    if (t < 0.34) return (t - 0.22) / 0.12;
-    if (t < 0.80) return 1;
-    return ((0.92 - t) / 0.12).clamp(0.0, 1.0);
   }
 }

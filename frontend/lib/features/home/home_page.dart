@@ -57,6 +57,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       body: ListView(
+        clipBehavior: Clip.none,
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
         physics: const ClampingScrollPhysics(),
         children: [
@@ -380,7 +381,8 @@ class _HeroBalanceState extends State<_HeroBalance> {
     final even = snap.isEven;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, _penny ? 10 : 8, 16, 8),
+      clipBehavior: Clip.none,
       decoration: BoxDecoration(
         color: colors.hero,
         borderRadius: BorderRadius.circular(22),
@@ -391,6 +393,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_penny) const SizedBox(height: 56),
               Text(
                 'SITUAZIONE ATTUALE',
                 style: TextStyle(
@@ -498,8 +501,8 @@ class _HeroBalanceState extends State<_HeroBalance> {
             ),
           if (_penny)
             const Positioned(
-              right: -4,
-              bottom: 14,
+              right: -2,
+              bottom: 10,
               child: IgnorePointer(child: PennyOnButton()),
             ),
         ],

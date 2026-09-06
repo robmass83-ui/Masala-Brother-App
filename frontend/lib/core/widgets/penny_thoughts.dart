@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// Frasi di Penny nella nuvoletta. Solo il testo, senza numeri.
 const List<String> pennyThoughts = [
   'Penny ha rosicchiato il divano.',
@@ -52,3 +54,14 @@ const List<String> pennyThoughts = [
   'Rapirò la ciotola vuota. Simbolicamente.',
   'Piano geniale. Dettagli top secret.',
 ];
+
+/// Una frase per processo: cambia solo chiudendo e riaprendo l’app.
+class PennySession {
+  static String? _phrase;
+  static final _rng = math.Random();
+
+  static String get phrase =>
+      _phrase ??= pennyThoughts[_rng.nextInt(pennyThoughts.length)];
+
+  static void resetForTest() => _phrase = null;
+}

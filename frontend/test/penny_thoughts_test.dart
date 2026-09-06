@@ -12,4 +12,12 @@ void main() {
       expect(RegExp(r'^\d+').hasMatch(line), isFalse);
     }
   });
+
+  test('Penny keeps the same phrase for the whole app session', () {
+    PennySession.resetForTest();
+    final first = PennySession.phrase;
+    expect(first, isNotEmpty);
+    expect(PennySession.phrase, first);
+    expect(PennySession.phrase, first);
+  });
 }
