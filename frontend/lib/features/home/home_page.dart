@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,8 @@ import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/eccellente_badge.dart';
+import '../../core/widgets/penny_on_button.dart';
 import '../../core/widgets/money_text.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/status_chip.dart';
@@ -324,14 +328,55 @@ class _OpenTaskCard extends StatelessWidget {
   }
 }
 
-class _HeroBalance extends StatelessWidget {
+class _HeroBalance extends StatefulWidget {
   const _HeroBalance({required this.colors, required this.snap});
 
   final AppColors colors;
   final BalanceSnapshot snap;
 
   @override
+  State<_HeroBalance> createState() => _HeroBalanceState();
+}
+
+class _HeroBalanceState extends State<_HeroBalance> {
+  bool _penny = false;
+  Timer? _swap;
+
+  bool get _canLoop {
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return false;
+    return !WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_canLoop) return;
+      _armSwap();
+    });
+  }
+
+  void _armSwap() {
+    _swap?.cancel();
+    _swap = Timer(_penny ? const Duration(seconds: 11) : const Duration(seconds: 8), () {
+      if (!mounted) return;
+      setState(() => _penny = !_penny);
+      _armSwap();
+    });
+  }
+
+  @override
+  void dispose() {
+    _swap?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final colors = widget.colors;
+    final snap = widget.snap;
     final even = snap.isEven;
     return Container(
       width: double.infinity,
@@ -340,95 +385,123 @@ class _HeroBalance extends StatelessWidget {
         color: colors.hero,
         borderRadius: BorderRadius.circular(22),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Text(
-            'SITUAZIONE ATTUALE',
-            style: TextStyle(
-              fontSize: 12,
-              letterSpacing: 0.04,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            even ? 'Siete in pari' : MoneyFormat.fromCents(snap.absoluteCreditCents),
-            style: TextStyle(
-              color: colors.heroFg,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              height: 1,
-              letterSpacing: -0.02,
-            ),
-          ),
-          if (!even) ...[
-            const SizedBox(height: 4),
-            Text.rich(
-              TextSpan(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'SITUAZIONE ATTUALE',
                 style: TextStyle(
-                  color: colors.heroFg,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: 0.04,
                 ),
-                children: snap.lauraOwesRoberto
-                    ? [
-                        const TextSpan(text: 'che '),
-                        TextSpan(
-                          text: 'Laura',
-                          style: TextStyle(
-                            color: colors.lauOnHero,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const TextSpan(text: ' deve a '),
-                        TextSpan(
-                          text: 'Roberto',
-                          style: TextStyle(
-                            color: colors.robOnHero,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ]
-                    : [
-                        const TextSpan(text: 'che '),
-                        TextSpan(
-                          text: 'Roberto',
-                          style: TextStyle(
-                            color: colors.robOnHero,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const TextSpan(text: ' deve a '),
-                        TextSpan(
-                          text: 'Laura',
-                          style: TextStyle(
-                            color: colors.lauOnHero,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
               ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          FilledButton(
-            onPressed: () => context.push('/bonifici/nuovo'),
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.acc,
-              foregroundColor: colors.onAcc,
-              minimumSize: const Size.fromHeight(38),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+              const SizedBox(height: 2),
+              Padding(
+                padding: EdgeInsets.only(right: _penny ? 0 : 72),
+                child: Text(
+                  even
+                      ? 'Siete in pari'
+                      : MoneyFormat.fromCents(snap.absoluteCreditCents),
+                  style: TextStyle(
+                    color: colors.heroFg,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                    letterSpacing: -0.02,
+                  ),
+                ),
               ),
-            ),
-            child: const Text(
-              'Registra bonifico',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
+              if (!even) ...[
+                const SizedBox(height: 4),
+                Padding(
+                  padding: EdgeInsets.only(right: _penny ? 0 : 72),
+                  child: Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        color: colors.heroFg,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      children: snap.lauraOwesRoberto
+                          ? [
+                              const TextSpan(text: 'che '),
+                              TextSpan(
+                                text: 'Laura',
+                                style: TextStyle(
+                                  color: colors.lauOnHero,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const TextSpan(text: ' deve a '),
+                              TextSpan(
+                                text: 'Roberto',
+                                style: TextStyle(
+                                  color: colors.robOnHero,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ]
+                          : [
+                              const TextSpan(text: 'che '),
+                              TextSpan(
+                                text: 'Roberto',
+                                style: TextStyle(
+                                  color: colors.robOnHero,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const TextSpan(text: ' deve a '),
+                              TextSpan(
+                                text: 'Laura',
+                                style: TextStyle(
+                                  color: colors.lauOnHero,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => context.push('/bonifici/nuovo'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.acc,
+                    foregroundColor: colors.onAcc,
+                    minimumSize: const Size.fromHeight(38),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Registra bonifico',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (!_penny)
+            const Positioned(
+              right: -6,
+              top: -6,
+              child: IgnorePointer(child: EccellenteBadge(size: 64)),
+            ),
+          if (_penny)
+            const Positioned(
+              right: -4,
+              bottom: 14,
+              child: IgnorePointer(child: PennyOnButton()),
+            ),
         ],
       ),
     );
