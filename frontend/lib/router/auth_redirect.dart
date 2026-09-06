@@ -7,8 +7,8 @@ const loginLocation = '/login';
 const privateLocation = '/privata';
 const homeLocation = '/';
 
-/// Decides where to send the user. Login is only for a real signed-out session,
-/// never while Firebase is still restoring the last Google account.
+/// Decides where to send the user. Accedi is never shown: a signed-out session
+/// stays on boot while Google silent/interactive restore runs.
 String? authRedirect({
   required AsyncValue<AuthSession> auth,
   required String loc,
@@ -25,9 +25,9 @@ String? authRedirect({
   final session = auth.valueOrNull ?? const AuthSession.unknown();
   switch (session.status) {
     case AuthStatus.unknown:
-      return booting ? null : bootLocation;
     case AuthStatus.signedOut:
-      return loggingIn ? null : loginLocation;
+      if (loggingIn) return bootLocation;
+      return booting ? null : bootLocation;
     case AuthStatus.unauthorized:
       return privatePage ? null : privateLocation;
     case AuthStatus.authorized:

@@ -1,7 +1,7 @@
 name: brotherapp
 description: Masala Brother App — gestione spese condivise Roberto e Laura
 publish_to: 'none'
-version: 1.0.2+5
+version: 1.0.3+6
 
 environment:
   sdk: ^3.13.2

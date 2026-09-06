@@ -46,6 +46,8 @@ class AuthRepository {
     return FirebaseAuth.instance;
   }
 
+  Future<AuthSession>? _restoreFuture;
+
   Stream<AuthSession> watchSession() {
     if (_demoMode) {
       return Stream<AuthSession>.multi((listener) {
@@ -58,6 +60,7 @@ class AuthRepository {
         listener.onCancel = sub.cancel;
       });
     }
+    unawaited(restoreSession());
     return _auth!.authStateChanges().asyncMap(_mapFirebaseUser);
   }
 
@@ -101,7 +104,46 @@ class AuthRepository {
 
     final googleUser = await _googleSignIn.signIn();
     if (googleUser == null) return currentSession();
+    return _completeGoogleSignIn(googleUser);
+  }
 
+  /// Re-enters with the last Google account. Shows the system account picker
+  /// only if silent restore cannot find a session — never the Accedi screen.
+  Future<AuthSession> restoreSession({bool forcePrompt = false}) {
+    if (!forcePrompt && _restoreFuture != null) return _restoreFuture!;
+    final future = _restoreSession(forcePrompt: forcePrompt);
+    _restoreFuture = future;
+    return future.whenComplete(() {
+      if (identical(_restoreFuture, future)) _restoreFuture = null;
+    });
+  }
+
+  Future<AuthSession> _restoreSession({required bool forcePrompt}) async {
+    if (_demoMode) {
+      if (_demoSession.isAuthorized && !forcePrompt) return _demoSession;
+      return signInWithGoogle();
+    }
+
+    final existing = _auth?.currentUser;
+    if (existing != null && !forcePrompt) {
+      return _mapFirebaseUser(existing);
+    }
+
+    try {
+      GoogleSignInAccount? googleUser;
+      if (!forcePrompt) {
+        googleUser = await _googleSignIn.signInSilently();
+      }
+      googleUser ??= await _googleSignIn.signIn();
+      if (googleUser == null) return await currentSession();
+      return await _completeGoogleSignIn(googleUser);
+    } catch (e, st) {
+      debugPrint('Google restore failed: $e\n$st');
+      return currentSession();
+    }
+  }
+
+  Future<AuthSession> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
     final googleAuth = await googleUser.authentication;
     final credential = GoogleAuthProvider.credential(
       accessToken: googleAuth.accessToken,

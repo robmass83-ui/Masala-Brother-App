@@ -41,10 +41,10 @@ void main() {
     expect(authRedirect(auth: unknown, loc: loginLocation), bootLocation);
   });
 
-  test('signed out is the only case that opens Google login', () {
-    expect(authRedirect(auth: signedOut, loc: bootLocation), loginLocation);
-    expect(authRedirect(auth: signedOut, loc: loginLocation), isNull);
-    expect(authRedirect(auth: signedOut, loc: homeLocation), loginLocation);
+  test('signed out stays on boot and never opens Accedi', () {
+    expect(authRedirect(auth: signedOut, loc: bootLocation), isNull);
+    expect(authRedirect(auth: signedOut, loc: loginLocation), bootLocation);
+    expect(authRedirect(auth: signedOut, loc: homeLocation), bootLocation);
   });
 
   test('authorized skips login and boot', () {

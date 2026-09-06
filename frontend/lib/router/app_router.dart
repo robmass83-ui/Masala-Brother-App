@@ -6,7 +6,6 @@ import '../core/widgets/app_scaffold.dart';
 import '../features/auth/auth_models.dart';
 import '../features/auth/auth_providers.dart';
 import '../features/auth/boot_page.dart';
-import '../features/auth/login_page.dart';
 import '../features/auth/private_app_page.dart';
 import '../features/common/placeholder_page.dart';
 import '../features/export/export_page.dart';
@@ -53,7 +52,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: loginLocation,
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) => const BootPage(),
       ),
       GoRoute(
         path: privateLocation,

@@ -19,6 +19,10 @@ void main() {
 
     await repo.signOut();
     expect((await repo.currentSession()).status, AuthStatus.signedOut);
+
+    final restored = await repo.restoreSession();
+    expect(restored.status, AuthStatus.authorized);
+    expect(restored.user?.email, 'robmass83@gmail.com');
   });
 
   test('unauthorized demo lands on privata status', () async {
