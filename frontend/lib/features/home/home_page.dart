@@ -381,7 +381,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
     final even = snap.isEven;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(16, _penny ? 10 : 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       clipBehavior: Clip.none,
       decoration: BoxDecoration(
         color: colors.hero,
@@ -393,7 +393,6 @@ class _HeroBalanceState extends State<_HeroBalance> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_penny) const SizedBox(height: 56),
               Text(
                 'SITUAZIONE ATTUALE',
                 style: TextStyle(
@@ -403,7 +402,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
               ),
               const SizedBox(height: 2),
               Padding(
-                padding: EdgeInsets.only(right: _penny ? 0 : 72),
+                padding: const EdgeInsets.only(right: 86),
                 child: Text(
                   even
                       ? 'Siete in pari'
@@ -420,7 +419,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
               if (!even) ...[
                 const SizedBox(height: 4),
                 Padding(
-                  padding: EdgeInsets.only(right: _penny ? 0 : 72),
+                  padding: const EdgeInsets.only(right: 86),
                   child: Text.rich(
                     TextSpan(
                       style: TextStyle(
@@ -501,8 +500,8 @@ class _HeroBalanceState extends State<_HeroBalance> {
             ),
           if (_penny)
             const Positioned(
-              right: -2,
-              bottom: 10,
+              right: 2,
+              bottom: 20,
               child: IgnorePointer(child: PennyOnButton()),
             ),
         ],
