@@ -23,6 +23,11 @@ service cloud.firestore {
         && request.auth.token.email in get(householdPath()).data.memberEmails;
     }
 
+    function listOwnerOk(data, key) {
+      return data.get(key, null) == null
+        || data.get(key, null) == request.auth.uid;
+    }
+
     match /households/{householdId} {
       allow read: if isMemberEmail();
       // Members can update members map / flags; cannot escalate by rewriting emails
@@ -31,9 +36,27 @@ service cloud.firestore {
       allow update: if isMemberEmail();
       allow delete: if false;
 
-      match /{subcollection}/{docId} {
+      match /taskLists/{id} {
         allow read: if isMemberEmail();
-        allow create, update: if isMemberEmail();
+        allow create, update: if isMemberEmail()
+          && listOwnerOk(request.resource.data, 'ownerUid');
+        allow delete: if false;
+      }
+
+      match /tasks/{id} {
+        allow read: if isMemberEmail();
+        allow create, update: if isMemberEmail()
+          && listOwnerOk(request.resource.data, 'listOwnerUid');
+        allow delete: if false;
+      }
+
+      match /{subcollection}/{docId} {
+        allow read: if isMemberEmail()
+          && subcollection != 'tasks'
+          && subcollection != 'taskLists';
+        allow create, update: if isMemberEmail()
+          && subcollection != 'tasks'
+          && subcollection != 'taskLists';
         // Soft-delete only — hard deletes forbidden.
         allow delete: if false;
       }

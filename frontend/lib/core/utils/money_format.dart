@@ -12,6 +12,12 @@ class MoneyFormat {
 
   static String fromCents(int cents) => _fmt.format(cents / 100);
 
+  /// ASCII-safe for PDF built-in fonts (no euro sign).
+  static String fromCentsPdf(int cents) {
+    final n = NumberFormat('#,##0.00', 'it_IT').format(cents / 100);
+    return '$n EUR';
+  }
+
   static int parseToCents(String raw) {
     final cleaned = raw
         .replaceAll('€', '')

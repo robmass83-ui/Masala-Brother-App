@@ -98,6 +98,85 @@ void main() {
     expect(snap.creditRobCents, 51);
   });
 
+  test('transfer Lau→Rob reduces creditRob', () {
+    final snap = calc.calculate(
+      expenses: const [
+        ExpenseBalanceInput(
+          amountDueCents: 10000,
+          paidRobCents: 10000,
+          paidLauCents: 0,
+        ),
+      ],
+      transfers: const [
+        TransferBalanceInput(fromUid: lau, toUid: rob, amountCents: 3000),
+      ],
+      robUid: rob,
+      lauUid: lau,
+    );
+    // Expense credit 5000, minus 3000 settlement.
+    expect(snap.creditRobCents, 2000);
+    expect(snap.paidRobCents, 7000);
+    expect(snap.paidLauCents, 3000);
+  });
+
+  test('settling transfer of the full credit zeros the balance', () {
+    final before = calc.calculate(
+      expenses: const [
+        ExpenseBalanceInput(
+          amountDueCents: 9764138,
+          paidRobCents: 5320719,
+          paidLauCents: 4443419,
+        ),
+      ],
+      transfers: const [],
+      robUid: rob,
+      lauUid: lau,
+    );
+    expect(before.creditRobCents, 438650);
+
+    final after = calc.calculate(
+      expenses: const [
+        ExpenseBalanceInput(
+          amountDueCents: 9764138,
+          paidRobCents: 5320719,
+          paidLauCents: 4443419,
+        ),
+      ],
+      transfers: const [
+        TransferBalanceInput(fromUid: lau, toUid: rob, amountCents: 438650),
+      ],
+      robUid: rob,
+      lauUid: lau,
+    );
+    expect(after.creditRobCents, 0);
+    expect(after.isEven, isTrue);
+  });
+
+  test('import placeholder transfer uids still count after Laura logs in', () {
+    const realRob = 'firebase-rob';
+    const realLau = 'firebase-lau';
+    final snap = calc.calculate(
+      expenses: const [
+        ExpenseBalanceInput(
+          amountDueCents: 7028556,
+          paidRobCents: 4458119,
+          paidLauCents: 2570788,
+        ),
+      ],
+      transfers: const [
+        TransferBalanceInput(fromUid: realRob, toUid: 'lau', amountCents: 147000),
+        TransferBalanceInput(fromUid: realRob, toUid: 'lau', amountCents: 240000),
+        TransferBalanceInput(fromUid: 'lau', toUid: realRob, amountCents: 75000),
+      ],
+      robUid: realRob,
+      lauUid: realLau,
+    );
+    expect(snap.paidRobCents, 4770119);
+    expect(snap.paidLauCents, 2258788);
+    expect(snap.absoluteCreditCents, 1255666);
+    expect(snap.lauraOwesRoberto, isTrue);
+  });
+
   test('expenseStatus mapping', () {
     expect(
       expenseStatus(amountDueCents: 100, paidTotalCents: 0),

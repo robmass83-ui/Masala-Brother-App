@@ -8,15 +8,18 @@ class PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.expand = true,
+    this.icon,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool expand;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final text = Text(label, maxLines: 1, overflow: TextOverflow.ellipsis);
     return SizedBox(
       height: 56,
       width: expand ? double.infinity : null,
@@ -35,7 +38,16 @@ class PrimaryButton extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        child: Text(label),
+        child: icon == null
+            ? text
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 22),
+                  const SizedBox(width: 10),
+                  Flexible(child: text),
+                ],
+              ),
       ),
     );
   }

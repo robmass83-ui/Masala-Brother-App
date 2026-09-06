@@ -12,8 +12,10 @@ void main() {
 
     final session = await repo.signInWithGoogle();
     expect(session.status, AuthStatus.authorized);
-    expect(session.user?.email, 'roberto@example.com');
-    expect(session.household?.isEmailAllowed('roberto@example.com'), isTrue);
+    expect(session.user?.email, 'robmass83@gmail.com');
+    expect(session.household?.isEmailAllowed('robmass83@gmail.com'), isTrue);
+    expect(session.household?.robUid, 'demo-roberto');
+    expect(session.household?.lauUid, 'demo-laura');
 
     await repo.signOut();
     expect((await repo.currentSession()).status, AuthStatus.signedOut);
@@ -38,5 +40,32 @@ void main() {
     expect(h.isEmailAllowed('roberto@example.com'), isTrue);
     expect(h.isEmailAllowed('LAURA@EXAMPLE.COM'), isTrue);
     expect(h.isEmailAllowed('altro@gmail.com'), isFalse);
+  });
+
+  test('isLauUid recognizes import placeholder after Laura joins', () {
+    const h = Household(
+      id: 'main',
+      memberEmails: ['rob@example.com', 'laura@example.com'],
+      members: {
+        'firebase-rob': HouseholdMember(
+          uid: 'firebase-rob',
+          name: 'Roberto',
+          initial: 'R',
+          colorKey: ColorKey.rob,
+        ),
+        'firebase-lau': HouseholdMember(
+          uid: 'firebase-lau',
+          name: 'Laura',
+          initial: 'L',
+          colorKey: ColorKey.lau,
+        ),
+      },
+    );
+    expect(h.robUid, 'firebase-rob');
+    expect(h.lauUid, 'firebase-lau');
+    expect(h.isLauUid('lau'), isTrue);
+    expect(h.isLauUid('firebase-lau'), isTrue);
+    expect(h.isRobUid('rob'), isTrue);
+    expect(h.isLauUid('firebase-rob'), isFalse);
   });
 }

@@ -1,11 +1,11 @@
 {
-    "name": "brotherapp",
-    "short_name": "brotherapp",
+    "name": "Brother App",
+    "short_name": "Brother App",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#13181C",
+    "theme_color": "#13181C",
+    "description": "Spese condivise di Roberto e Laura",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -22,27 +22,37 @@ class PersonAvatar extends StatelessWidget {
     final radius = size / 3;
 
     if (empty || person == null) {
-      return CustomPaint(
-        size: Size.square(size),
-        painter: _DashedAvatarPainter(color: c.ink3, radius: radius),
+      return Semantics(
+        label: 'Nessuno',
+        image: true,
+        child: CustomPaint(
+          size: Size.square(size),
+          painter: _DashedAvatarPainter(color: c.ink3, radius: radius),
+        ),
       );
     }
 
     final isRob = person == PersonKey.rob;
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: isRob ? c.robSoft : c.lauSoft,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      child: Text(
-        isRob ? 'R' : 'L',
-        style: TextStyle(
-          color: isRob ? c.rob : c.lau,
-          fontWeight: FontWeight.w800,
-          fontSize: size * 0.4,
+    return Semantics(
+      label: isRob ? 'Roberto' : 'Laura',
+      image: true,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isRob ? c.robSoft : c.lauSoft,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: ExcludeSemantics(
+          child: Text(
+            isRob ? 'R' : 'L',
+            style: TextStyle(
+              color: isRob ? c.rob : c.lau,
+              fontWeight: FontWeight.w800,
+              fontSize: size * 0.4,
+            ),
+          ),
         ),
       ),
     );

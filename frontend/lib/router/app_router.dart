@@ -3,15 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/app_scaffold.dart';
-import '../features/auth/auth_models.dart';
 import '../features/auth/auth_providers.dart';
+import '../features/auth/boot_page.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/private_app_page.dart';
 import '../features/common/placeholder_page.dart';
 import '../features/export/export_page.dart';
 import '../features/home/home_page.dart';
 import '../features/report/report_page.dart';
+import '../features/settings/activity_page.dart';
+import '../features/settings/appearance_page.dart';
+import '../features/settings/catalog_page.dart';
+import '../features/settings/participants_page.dart';
+import '../features/settings/property_form_page.dart';
+import '../features/settings/reminders_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/settings/trash_page.dart';
 import '../features/expenses/expense_detail_page.dart';
 import '../features/expenses/expense_form_page.dart';
 import '../features/expenses/expenses_list_page.dart';
@@ -20,8 +27,8 @@ import '../features/tasks/tasks_page.dart';
 import '../features/transfers/transfer_form_page.dart';
 import '../features/transfers/transfers_list_page.dart';
 import '../features/import_excel/import_excel_page.dart';
-
-final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+import 'auth_redirect.dart';
+import 'navigator_keys.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authRefresh = _AuthRefresh(ref);
@@ -29,39 +36,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: '/login',
+    initialLocation: bootLocation,
     refreshListenable: authRefresh,
+    observers: [_ClearSnackBarsObserver()],
     redirect: (context, state) {
-      final auth = ref.read(authSessionProvider);
-      final loc = state.matchedLocation;
-
-      if (auth.isLoading || auth.isRefreshing) {
-        return null;
-      }
-
-      final session = auth.valueOrNull ?? const AuthSession.unknown();
-      final loggingIn = loc == '/login';
-      final privatePage = loc == '/privata';
-
-      switch (session.status) {
-        case AuthStatus.unknown:
-          return loggingIn ? null : '/login';
-        case AuthStatus.signedOut:
-          return loggingIn ? null : '/login';
-        case AuthStatus.unauthorized:
-          return privatePage ? null : '/privata';
-        case AuthStatus.authorized:
-          if (loggingIn || privatePage) return '/';
-          return null;
-      }
+      return authRedirect(
+        auth: ref.read(authSessionProvider),
+        loc: state.matchedLocation,
+      );
     },
     routes: [
       GoRoute(
-        path: '/login',
+        path: bootLocation,
+        builder: (context, state) => const BootPage(),
+      ),
+      GoRoute(
+        path: loginLocation,
         builder: (context, state) => const LoginPage(),
       ),
       GoRoute(
-        path: '/privata',
+        path: privateLocation,
         builder: (context, state) => const PrivateAppPage(),
       ),
       StatefulShellRoute.indexedStack(
@@ -85,18 +79,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'nuova',
-                    builder: (context, state) => const ExpenseFormPage(),
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => ExpenseFormPage(
+                      prefill: state.extra is ExpenseFormPrefill
+                          ? state.extra as ExpenseFormPrefill
+                          : null,
+                    ),
                   ),
                   GoRoute(
                     path: ':id',
+                    parentNavigatorKey: rootNavigatorKey,
                     builder: (context, state) => ExpenseDetailPage(
                       id: state.pathParameters['id']!,
                     ),
                     routes: [
                       GoRoute(
                         path: 'modifica',
+                        parentNavigatorKey: rootNavigatorKey,
                         builder: (context, state) => ExpenseFormPage(
                           id: state.pathParameters['id'],
+                          prefill: state.extra is ExpenseFormPrefill
+                              ? state.extra as ExpenseFormPrefill
+                              : null,
                         ),
                       ),
                     ],
@@ -113,7 +117,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'nuova',
-                    builder: (context, state) => const TaskFormPage(),
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      String? listId;
+                      if (extra is Map && extra['listId'] is String) {
+                        listId = extra['listId'] as String;
+                      }
+                      return TaskFormPage(initialListId: listId);
+                    },
+                  ),
+                  GoRoute(
+                    path: ':id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => TaskFormPage(
+                      id: state.pathParameters['id'],
+                    ),
                   ),
                 ],
               ),
@@ -124,6 +143,59 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/altro',
                 builder: (context, state) => const SettingsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'partecipanti',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const ParticipantsPage(),
+                  ),
+                  GoRoute(
+                    path: 'immobili',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) =>
+                        const CatalogPage(kind: CatalogKind.properties),
+                    routes: [
+                      GoRoute(
+                        path: 'nuovo',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) => const PropertyFormPage(),
+                      ),
+                      GoRoute(
+                        path: ':id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (context, state) => PropertyFormPage(
+                          id: state.pathParameters['id'],
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'categorie',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) =>
+                        const CatalogPage(kind: CatalogKind.categories),
+                  ),
+                  GoRoute(
+                    path: 'aspetto',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const AppearancePage(),
+                  ),
+                  GoRoute(
+                    path: 'promemoria',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const RemindersPage(),
+                  ),
+                  GoRoute(
+                    path: 'attivita',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const ActivityPage(),
+                  ),
+                  GoRoute(
+                    path: 'cestino',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const TrashPage(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -177,4 +249,22 @@ class _AuthRefresh extends ChangeNotifier {
     _sub.close();
     super.dispose();
   }
+}
+
+class _ClearSnackBarsObserver extends NavigatorObserver {
+  void _clear() {
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx == null) return;
+    ScaffoldMessenger.maybeOf(ctx)?.clearSnackBars();
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _clear();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _clear();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _clear();
 }

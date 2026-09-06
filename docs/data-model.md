@@ -63,12 +63,17 @@ Bonifico di conguaglio (non è una spesa).
 
 ## `categories/{id}` / `properties/{id}`
 
-- categories: `{name, order, isDefault}` — seed: Bollette, Condominio, Lavori e fatture, Tasse e tributi, Notaio e pratiche, Assicurazioni, Altro
-- properties: `{name, shortName, order}` — seed: Forlanini 9, Via Addis, Via Prunizzedda, Sassari / altro
+- categories: `{name, order, isDefault, deletedAt?}` — seed: Bollette, Condominio, Lavori e fatture, Tasse e tributi, Notaio e pratiche, Assicurazioni, Altro
+- properties: `{name, shortName, street, houseNumber, interno, scala, floor, postalCode, city, notes, order, deletedAt?}` — seed: Via Forlanini (civico 9), Via Addis, Via Prunizzedda, Sassari / altro. `name` è l'etichetta in lista (es. "Via Forlanini"); il resto è il registro appartamento, visibile nel dettaglio da Altro → Immobili.
+- Modificabili da Altro (rinomina, riordino, nuove voci). Le predefinite non si archiviano. Soft-delete con `deletedAt` (le regole vietano hard delete).
 
-## `activity/{id}` (opzionale)
+## `activity/{id}`
 
-`{type, refId, byUid, at, summary}` — cronologia in Altro → Attività.
+`{type, refId, byUid, at, summary}` — cronologia in Altro → Attività (create/modifiche/cestino di spese, bonifici, cose da fare, catalogo).
+
+## Cestino
+
+Spese, bonifici, cose da fare e liste con `deletedAt` negli ultimi 30 giorni: Altro → Cestino, con ripristino.
 
 ## Saldo (client-side)
 

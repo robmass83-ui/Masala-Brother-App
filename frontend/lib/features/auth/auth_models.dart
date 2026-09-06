@@ -73,6 +73,38 @@ class Household {
     final lower = email.toLowerCase();
     return memberEmails.any((e) => e.toLowerCase() == lower);
   }
+
+  String get robUid {
+    for (final e in members.entries) {
+      if (e.value.colorKey == ColorKey.rob) return e.key;
+    }
+    return members.keys.isEmpty ? 'rob' : members.keys.first;
+  }
+
+  String get lauUid {
+    for (final e in members.entries) {
+      if (e.value.colorKey == ColorKey.lau) return e.key;
+    }
+    if (members.length > 1) return members.keys.elementAt(1);
+    return 'lau';
+  }
+
+  HouseholdMember? memberByUid(String uid) => members[uid];
+
+  /// True for Laura's live uid, the import placeholder `lau`, or her colorKey.
+  bool isLauUid(String? uid) {
+    if (uid == null || uid.isEmpty) return false;
+    if (uid == lauUid || uid == 'lau') return true;
+    if (uid == robUid || uid == 'rob') return false;
+    return members[uid]?.colorKey == ColorKey.lau ||
+        (members[uid] == null && uid != robUid);
+  }
+
+  bool isRobUid(String? uid) {
+    if (uid == null || uid.isEmpty) return false;
+    if (uid == robUid || uid == 'rob') return true;
+    return members[uid]?.colorKey == ColorKey.rob;
+  }
 }
 
 enum AuthStatus { unknown, signedOut, authorized, unauthorized }

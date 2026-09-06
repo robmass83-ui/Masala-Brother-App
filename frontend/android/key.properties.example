@@ -1,0 +1,4 @@
+storePassword=cambia-questa-password
+keyPassword=cambia-questa-password
+keyAlias=upload
+storeFile=upload-keystore.jks

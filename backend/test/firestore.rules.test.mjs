@@ -81,10 +81,44 @@ describe('households/main access', () => {
     await assertFails(deleteDoc(ref));
   });
 
-  it('denies outsider write on expenses', async () => {
-    const db = authed('altro@gmail.com');
+  it('allows member to create transfer; denies hard delete', async () => {
+    const db = authed('laura@example.com');
+    const ref = doc(db, 'households/main/transfers/t1');
+    await assertSucceeds(
+      setDoc(ref, {
+        fromUid: 'uid-laura@example.com',
+        toUid: 'uid-roberto@example.com',
+        amountCents: 438650,
+        deletedAt: null,
+      }),
+    );
+    await assertSucceeds(updateDoc(ref, { deletedAt: new Date().toISOString() }));
+    await assertFails(deleteDoc(ref));
+  });
+
+  it('allows personal task list owned by self; denies owning as the other', async () => {
+    const rob = authed('roberto@example.com');
+    await assertSucceeds(
+      setDoc(doc(rob, 'households/main/taskLists/campagna'), {
+        name: 'Campagna',
+        ownerUid: 'uid-roberto@example.com',
+        deletedAt: null,
+      }),
+    );
     await assertFails(
-      setDoc(doc(db, 'households/main/expenses/x'), { description: 'nope' }),
+      setDoc(doc(rob, 'households/main/taskLists/laura-only'), {
+        name: 'No',
+        ownerUid: 'uid-laura@example.com',
+        deletedAt: null,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(rob, 'households/main/tasks/t1'), {
+        title: 'Comprare la terra',
+        listId: 'campagna',
+        listOwnerUid: 'uid-roberto@example.com',
+        deletedAt: null,
+      }),
     );
   });
 });

@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import 'core/config/app_config.dart';
-import 'firebase_options.example.dart' as opts;
+import 'firebase_options.dart' as opts;
 
 Future<FirebaseBootstrapResult> bootstrapFirebase() async {
   if (AppConfig.demoAuth || !opts.DefaultFirebaseOptions.isConfigured) {

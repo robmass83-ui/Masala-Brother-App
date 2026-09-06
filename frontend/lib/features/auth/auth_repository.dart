@@ -72,7 +72,7 @@ class AuthRepository {
         status: AuthStatus.authorized,
         user: const AppUser(
           uid: 'demo-roberto',
-          email: 'roberto@example.com',
+          email: 'robmass83@gmail.com',
           displayName: 'Roberto',
         ),
         household: Household(
@@ -84,6 +84,12 @@ class AuthRepository {
               name: 'Roberto',
               initial: 'R',
               colorKey: ColorKey.rob,
+            ),
+            'demo-laura': const HouseholdMember(
+              uid: 'demo-laura',
+              name: 'Laura',
+              initial: 'L',
+              colorKey: ColorKey.lau,
             ),
           },
         ),
@@ -173,5 +179,8 @@ class AuthRepository {
     }
   }
 
-  void dispose() => _demoController.close();
+  void dispose() {
+    _demoController.close();
+    _household.dispose();
+  }
 }

@@ -5,9 +5,14 @@ import '../theme/app_colors.dart';
 enum ExpenseStatusUi { daPagare, parziale, pagato }
 
 class StatusChip extends StatelessWidget {
-  const StatusChip({super.key, required this.status});
+  const StatusChip({
+    super.key,
+    required this.status,
+    this.compact = false,
+  });
 
   final ExpenseStatusUi status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -19,8 +24,8 @@ class StatusChip extends StatelessWidget {
     };
 
     return Container(
-      height: 26,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: compact ? 20 : 26,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bg,
@@ -30,8 +35,9 @@ class StatusChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: fg,
-          fontSize: 13,
+          fontSize: compact ? 11 : 13,
           fontWeight: FontWeight.w700,
+          height: 1,
         ),
       ),
     );

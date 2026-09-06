@@ -16,7 +16,22 @@ class AppConfig {
   );
 
   static const List<String> defaultMemberEmails = [
-    'roberto@example.com',
-    'laura@example.com',
+    'robmass83@gmail.com',
+    'laura.masala@tiscali.it',
   ];
+
+  /// Keep in sync with `pubspec.yaml` `version:`.
+  static const String appVersion = '1.0.1';
+  static const int appBuild = 4;
+
+  static const String githubOwner = 'robmass83-ui';
+  static const String githubRepo = 'Masala-Brother-App';
+
+  static const String githubReleasesUrl =
+      'https://github.com/$githubOwner/$githubRepo/releases';
+
+  static const String githubLatestReleaseApi =
+      'https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest';
+
+  static const Duration trashRetention = Duration(days: 30);
 }
