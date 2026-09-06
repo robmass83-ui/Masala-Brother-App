@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/widgets/app_scaffold.dart';
+import '../features/auth/auth_models.dart';
 import '../features/auth/auth_providers.dart';
 import '../features/auth/boot_page.dart';
 import '../features/auth/login_page.dart';
