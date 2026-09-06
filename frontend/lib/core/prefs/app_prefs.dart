@@ -8,8 +8,8 @@ class AppPrefs {
     this.reminderHour = 9,
     this.lastNotifiedUpdateVersion,
     this.dismissedUpdateVersion,
-    SharedPreferences? store,
-  }) : _store = store;
+    this._store,
+  });
 
   factory AppPrefs.memory({
     ThemeMode themeMode = ThemeMode.system,
