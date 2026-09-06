@@ -43,17 +43,20 @@ jobs:
           set -euo pipefail
           printf '%s' "$FIREBASE_OPTIONS" > lib/firebase_options.dart
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-          cat > android/key.properties <<EOF
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=upload-keystore.jks
-          EOF
           if ! grep -q 'class DefaultFirebaseOptions' lib/firebase_options.dart; then
             echo 'FIREBASE_OPTIONS secret is missing class DefaultFirebaseOptions.'
             echo 'Set it to the contents of frontend/lib/firebase_options.dart'
             exit 1
+          fi
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+            printf '%s\n' \
+              "storePassword=$KEYSTORE_PASSWORD" \
+              "keyPassword=$KEY_PASSWORD" \
+              "keyAlias=$KEY_ALIAS" \
+              "storeFile=upload-keystore.jks" > android/key.properties
+          else
+            echo "No KEYSTORE_BASE64 secret set; signing the release APK with the debug key."
           fi
 
       - run: flutter build apk --release --split-per-abi
