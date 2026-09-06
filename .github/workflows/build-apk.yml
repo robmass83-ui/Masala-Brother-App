@@ -23,6 +23,14 @@ jobs:
           flutter-version: '3.47.2'
           cache: true
 
+      - name: Stub Firebase options for analyze
+        run: cp lib/firebase_options.example.dart lib/firebase_options.dart
+
+      - run: flutter pub get
+      - run: flutter --version
+      - run: flutter analyze
+      - run: flutter test
+
       - name: Write Firebase and signing secrets
         env:
           FIREBASE_OPTIONS: ${{ secrets.FIREBASE_OPTIONS }}
@@ -42,11 +50,12 @@ jobs:
           keyAlias=$KEY_ALIAS
           storeFile=upload-keystore.jks
           EOF
+          if ! grep -q 'class DefaultFirebaseOptions' lib/firebase_options.dart; then
+            echo 'FIREBASE_OPTIONS secret is missing class DefaultFirebaseOptions.'
+            echo 'Set it to the contents of frontend/lib/firebase_options.dart'
+            exit 1
+          fi
 
-      - run: flutter pub get
-      - run: flutter --version
-      - run: flutter analyze
-      - run: flutter test
       - run: flutter build apk --release --split-per-abi
 
       - uses: softprops/action-gh-release@v2
