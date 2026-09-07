@@ -247,6 +247,32 @@ void main() {
     expect(items.map((t) => t.id).toList(), ['terra', 'muratore', 'carriola']);
   });
 
+  test('aperte keeps completed items at the bottom instead of hiding them', () {
+    const campagna = TaskList(id: 'c', name: 'Campagna');
+    final sections = groupTasksByList(
+      tasks: [
+        HouseholdTask(
+          id: 'carriola',
+          title: 'Comprare una carriola',
+          listId: 'c',
+          done: true,
+          doneAt: DateTime(2026, 9, 5, 10),
+        ),
+        HouseholdTask(
+          id: 'terra',
+          title: 'Comprare la terra',
+          listId: 'c',
+        ),
+      ],
+      lists: const [campagna],
+      viewerUid: 'demo-roberto',
+    );
+    final aperte = applyTaskListFilter(sections, TaskListFilter.aperte);
+    expect(aperte.single.items.map((t) => t.id).toList(), ['terra', 'carriola']);
+    final fatte = applyTaskListFilter(sections, TaskListFilter.fatte);
+    expect(fatte.single.items.map((t) => t.id).toList(), ['carriola']);
+  });
+
   test('taskListValidationError rejects empty names', () {
     expect(taskListValidationError('  '), isNotNull);
     expect(taskListValidationError('Campagna'), isNull);

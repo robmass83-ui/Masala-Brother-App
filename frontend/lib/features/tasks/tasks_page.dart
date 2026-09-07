@@ -299,16 +299,7 @@ class _TasksPageState extends ConsumerState<TasksPage> {
         household: household,
         actorUid: user.uid,
       );
-      return;
     }
-
-    showUndoSnackBar(
-      context,
-      message: markingDone ? 'Segnata come fatta' : 'Rimessa tra le aperte',
-      onUndo: () {
-        repo.setDone(task: task, done: !markingDone, actorUid: user.uid);
-      },
-    );
   }
 
   Future<void> _delete(HouseholdTask task, String uid) async {
@@ -460,14 +451,14 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPress: onLongPress,
-      onTap: onToggleSelect,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: onLongPress,
+          onTap: onToggleSelect,
+          child: Row(
             children: [
               if (managing) ...[
                 _ListCheck(selected: selected),
@@ -521,8 +512,11 @@ class _Section extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          DecoratedBox(
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: onToggleSelect,
+          child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               border: selected
@@ -541,8 +535,8 @@ class _Section extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -626,6 +620,12 @@ class _TaskRow extends StatelessWidget {
 
     final person = _personKey(household, task.assigneeUid);
 
+    Future<void> confirmDelete() async {
+      if (onDelete == null) return;
+      final ok = await _confirmDeleteTask(context);
+      if (ok) onDelete!();
+    }
+
     return Dismissible(
       key: ValueKey(task.id),
       direction: onDelete == null
@@ -641,36 +641,29 @@ class _TaskRow extends StatelessWidget {
         ),
       ),
       confirmDismiss: (_) async {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Eliminare questa cosa da fare?'),
-            content: const Text(
-              'Verrà nascosta. La spesa collegata, se c’è, resta in elenco.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('No'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Elimina'),
-              ),
-            ],
-          ),
-        );
-        if (ok == true) onDelete?.call();
+        await confirmDelete();
         return false;
       },
       child: InkWell(
       onTap: onOpen,
+      onLongPress: onDelete == null ? null : confirmDelete,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 68),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
             children: [
+              if (task.done && onDelete != null) ...[
+                IconButton(
+                  tooltip: 'Elimina',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  onPressed: confirmDelete,
+                  icon: Icon(Icons.delete_outline, color: c.ink3, size: 22),
+                ),
+                const SizedBox(width: 4),
+              ],
               _CheckBox(done: task.done, onTap: onToggle),
               const SizedBox(width: 14),
               Expanded(
@@ -717,6 +710,29 @@ class _TaskRow extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<bool> _confirmDeleteTask(BuildContext context) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Eliminare questa cosa da fare?'),
+      content: const Text(
+        'Verrà nascosta. La spesa collegata, se c’è, resta in elenco.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('No'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Elimina'),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
 }
 
 class _CheckBox extends StatelessWidget {

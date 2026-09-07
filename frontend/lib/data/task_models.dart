@@ -391,14 +391,9 @@ List<TaskListSection> applyTaskListFilter(
 ) {
   switch (filter) {
     case TaskListFilter.aperte:
-      return [
-        for (final s in sections)
-          if (s.list != null || s.items.any((t) => !t.done))
-            TaskListSection(
-              list: s.list,
-              items: s.items.where((t) => !t.done).toList(),
-            ),
-      ];
+    case TaskListFilter.tutte:
+      // Open items first; completed stay visible at the bottom.
+      return sections;
     case TaskListFilter.fatte:
       return [
         for (final s in sections)
@@ -408,8 +403,6 @@ List<TaskListSection> applyTaskListFilter(
               items: s.items.where((t) => t.done).toList(),
             ),
       ];
-    case TaskListFilter.tutte:
-      return sections;
   }
 }
 
