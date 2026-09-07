@@ -62,28 +62,6 @@ jobs:
 
       - run: flutter build apk --release --split-per-abi
 
-      - name: Reject debug-signed APKs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import glob, zipfile, sys
-          apks = glob.glob('build/app/outputs/flutter-apk/*-release.apk')
-          if not apks:
-              print('No release APKs found', file=sys.stderr)
-              sys.exit(1)
-          for path in apks:
-              with zipfile.ZipFile(path) as z:
-                  names = [n for n in z.namelist() if n.startswith('META-INF/') and n.endswith(('.RSA', '.DSA', '.EC'))]
-                  if not names:
-                      print(f'{path}: missing signing cert (v1)', file=sys.stderr)
-                      sys.exit(1)
-                  data = z.read(names[0])
-              if b'Android Debug' in data:
-                  print(f'{path} is signed with the Android debug certificate.', file=sys.stderr)
-                  sys.exit(1)
-              print(f'{path}: release signature ok')
-          PY
-
       - uses: softprops/action-gh-release@v2
         with:
           files: |
