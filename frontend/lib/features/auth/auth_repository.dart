@@ -20,7 +20,12 @@ class AuthRepository {
     GoogleSignIn? googleSignIn,
     HouseholdRepository? householdRepository,
     this.forceDemo,
-  })  : _googleSignIn = googleSignIn ?? GoogleSignIn(scopes: const ['email']),
+  })  : _googleSignIn = googleSignIn ??
+            GoogleSignIn(
+              scopes: const ['email'],
+              serverClientId:
+                  '654854343349-no0dh3pp17hqc048llb1ep0acsr03q83.apps.googleusercontent.com',
+            ),
         _household = householdRepository ??
             HouseholdRepository(
               firestore: Firebase.apps.isNotEmpty
@@ -132,19 +137,37 @@ class AuthRepository {
     try {
       GoogleSignInAccount? googleUser;
       if (!forcePrompt) {
-        googleUser = await _googleSignIn.signInSilently();
+        try {
+          googleUser = await _googleSignIn.signInSilently();
+        } catch (e, st) {
+          debugPrint('Google silent restore failed: $e\n$st');
+        }
       }
       googleUser ??= await _googleSignIn.signIn();
-      if (googleUser == null) return await currentSession();
+      if (googleUser == null) {
+        return const AuthSession(
+          status: AuthStatus.signedOut,
+          message: 'Accesso Google annullato.',
+        );
+      }
       return await _completeGoogleSignIn(googleUser);
     } catch (e, st) {
       debugPrint('Google restore failed: $e\n$st');
-      return currentSession();
+      return AuthSession(
+        status: AuthStatus.signedOut,
+        message: e.toString(),
+      );
     }
   }
 
   Future<AuthSession> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
     final googleAuth = await googleUser.authentication;
+    if (googleAuth.idToken == null) {
+      return const AuthSession(
+        status: AuthStatus.signedOut,
+        message: 'Google non ha inviato idToken. Controlla gli SHA in Firebase.',
+      );
+    }
     final credential = GoogleAuthProvider.credential(
       accessToken: googleAuth.accessToken,
       idToken: googleAuth.idToken,

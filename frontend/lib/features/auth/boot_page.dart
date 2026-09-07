@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import 'auth_models.dart';
 import 'auth_providers.dart';
@@ -16,6 +17,7 @@ class BootPage extends ConsumerStatefulWidget {
 class _BootPageState extends ConsumerState<BootPage> {
   bool _prompted = false;
   bool _showRetry = false;
+  String? _error;
 
   @override
   void initState() {
@@ -24,15 +26,20 @@ class _BootPageState extends ConsumerState<BootPage> {
   }
 
   Future<void> _restore() async {
-    setState(() => _showRetry = false);
-    await ref.read(authRepositoryProvider).restoreSession(
+    setState(() {
+      _showRetry = false;
+      _error = null;
+    });
+    final session = await ref.read(authRepositoryProvider).restoreSession(
           forcePrompt: _prompted,
         );
     _prompted = true;
     if (!mounted) return;
-    final session = ref.read(authSessionProvider).valueOrNull;
-    if (session == null || session.status == AuthStatus.signedOut) {
-      setState(() => _showRetry = true);
+    if (session.status == AuthStatus.signedOut) {
+      setState(() {
+        _showRetry = true;
+        _error = session.message;
+      });
     }
   }
 
@@ -78,6 +85,28 @@ class _BootPageState extends ConsumerState<BootPage> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'v${AppConfig.appVersion} (${AppConfig.appBuild})',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: c.ink2.withValues(alpha: 0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: c.ink2.withValues(alpha: 0.85),
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: _restore,
