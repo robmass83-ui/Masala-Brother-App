@@ -48,18 +48,41 @@ jobs:
             echo 'Set it to the contents of frontend/lib/firebase_options.dart'
             exit 1
           fi
-          if [ -n "${KEYSTORE_BASE64:-}" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
-            printf '%s\n' \
-              "storePassword=$KEYSTORE_PASSWORD" \
-              "keyPassword=$KEY_PASSWORD" \
-              "keyAlias=$KEY_ALIAS" \
-              "storeFile=upload-keystore.jks" > android/key.properties
-          else
-            echo "No KEYSTORE_BASE64 secret set; signing the release APK with the debug key."
+          if [ -z "${KEYSTORE_BASE64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ] || [ -z "${KEY_PASSWORD:-}" ] || [ -z "${KEY_ALIAS:-}" ]; then
+            echo '::error::Missing KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS.'
+            echo 'GitHub APKs must be signed with the upload keystore. The CI debug key is a different certificate every run, so Google Sign-In fails (error 10) and updates cannot install over the previous APK.'
+            exit 1
           fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          printf '%s\n' \
+            "storePassword=$KEYSTORE_PASSWORD" \
+            "keyPassword=$KEY_PASSWORD" \
+            "keyAlias=$KEY_ALIAS" \
+            "storeFile=upload-keystore.jks" > android/key.properties
 
       - run: flutter build apk --release --split-per-abi
+
+      - name: Reject debug-signed APKs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, zipfile, sys
+          apks = glob.glob('build/app/outputs/flutter-apk/*-release.apk')
+          if not apks:
+              print('No release APKs found', file=sys.stderr)
+              sys.exit(1)
+          for path in apks:
+              with zipfile.ZipFile(path) as z:
+                  names = [n for n in z.namelist() if n.startswith('META-INF/') and n.endswith(('.RSA', '.DSA', '.EC'))]
+                  if not names:
+                      print(f'{path}: missing signing cert (v1)', file=sys.stderr)
+                      sys.exit(1)
+                  data = z.read(names[0])
+              if b'Android Debug' in data:
+                  print(f'{path} is signed with the Android debug certificate.', file=sys.stderr)
+                  sys.exit(1)
+              print(f'{path}: release signature ok')
+          PY
 
       - uses: softprops/action-gh-release@v2
         with:
