@@ -9,6 +9,7 @@ import 'package:brotherapp/data/data_providers.dart';
 import 'package:brotherapp/data/expense_models.dart';
 import 'package:brotherapp/features/auth/auth_providers.dart';
 import 'package:brotherapp/features/auth/auth_repository.dart';
+import 'package:brotherapp/core/widgets/penny_thoughts.dart';
 import 'package:brotherapp/features/home/home_page.dart';
 import 'package:brotherapp/router/app_router.dart';
 
@@ -64,6 +65,10 @@ Future<void> _pumpShell(
 void main() {
   setUpAll(() async {
     await AppDateFormat.ensureInitialized();
+  });
+
+  setUp(() {
+    PennySession.resetForTest(showPenny: false);
   });
 
   for (final width in [360.0, 390.0, 412.0]) {

@@ -20,4 +20,18 @@ void main() {
     expect(PennySession.phrase, first);
     expect(PennySession.phrase, first);
   });
+
+  test('mascot stays the same until the app is closed', () {
+    PennySession.resetForTest();
+    final first = PennySession.showPenny;
+    expect(PennySession.showPenny, first);
+    expect(PennySession.showPenny, first);
+  });
+
+  test('resetForTest can pin Burns or Penny', () {
+    PennySession.resetForTest(showPenny: false);
+    expect(PennySession.showPenny, isFalse);
+    PennySession.resetForTest(showPenny: true);
+    expect(PennySession.showPenny, isTrue);
+  });
 }

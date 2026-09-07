@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'penny_thoughts.dart';
 
-/// Penny con le zampe sul bordo del bottone e nuvoletta piccola, inclinata.
+/// Penny con le zampe sul bordo del bottone e nuvoletta grande, inclinata.
 class PennyOnButton extends StatefulWidget {
   const PennyOnButton({super.key});
 
@@ -58,23 +58,23 @@ class _PennyOnButtonState extends State<PennyOnButton>
     return AnimatedBuilder(
       animation: Listenable.merge([_idle, _enter]),
       builder: (context, _) {
-        final bob = math.sin(_idle.value * math.pi) * 1.6;
+        final bob = math.sin(_idle.value * math.pi) * 1.8;
         final appear = Curves.easeOut.transform(_enter.value);
         return SizedBox(
-          width: 128,
-          height: 96,
+          width: 228,
+          height: 158,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                right: 4,
+                right: 2,
                 bottom: 0,
                 child: Transform.translate(
                   offset: Offset(0, -bob),
                   child: Image.asset(
                     'assets/mascot/penny.png',
-                    width: 52,
-                    height: 52,
+                    width: 82,
+                    height: 82,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
                     semanticLabel: 'Penny',
@@ -82,33 +82,19 @@ class _PennyOnButtonState extends State<PennyOnButton>
                 ),
               ),
               Positioned(
-                right: 30,
+                left: 0,
                 top: 0,
-                width: 98,
-                height: 62,
+                width: 178,
+                height: 126,
                 child: Opacity(
                   opacity: appear,
                   child: Transform.rotate(
-                    angle: -0.18,
+                    angle: -0.08,
                     alignment: Alignment.bottomRight,
                     child: Transform.scale(
-                      scale: 0.92 + appear * 0.08,
+                      scale: 0.94 + appear * 0.06,
                       alignment: Alignment.bottomRight,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.asset(
-                            'assets/mascot/nuvoletta.png',
-                            fit: BoxFit.contain,
-                            alignment: Alignment.center,
-                            filterQuality: FilterQuality.high,
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(22, 14, 22, 24),
-                            child: _ThoughtText(),
-                          ),
-                        ],
-                      ),
+                      child: const _ThoughtBubble(),
                     ),
                   ),
                 ),
@@ -117,6 +103,30 @@ class _PennyOnButtonState extends State<PennyOnButton>
           ),
         );
       },
+    );
+  }
+}
+
+class _ThoughtBubble extends StatelessWidget {
+  const _ThoughtBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/mascot/nuvoletta.png',
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+        ),
+        // Inset stays inside the white cloud, away from the scalloped edge.
+        const Padding(
+          padding: EdgeInsets.fromLTRB(40, 32, 46, 48),
+          child: Center(child: _ThoughtText()),
+        ),
+      ],
     );
   }
 }
@@ -132,9 +142,9 @@ class _ThoughtText extends StatelessWidget {
         final maxW = box.maxWidth;
         final maxH = box.maxHeight;
         if (maxW <= 0 || maxH <= 0) return const SizedBox.shrink();
-        var size = 8.5;
+        var size = 11.0;
         TextPainter? painter;
-        while (size >= 5.5) {
+        while (size >= 6.0) {
           painter = TextPainter(
             text: TextSpan(
               text: phrase,
@@ -142,7 +152,7 @@ class _ThoughtText extends StatelessWidget {
                 color: const Color(0xFF16181D),
                 fontSize: size,
                 fontWeight: FontWeight.w800,
-                height: 1.12,
+                height: 1.08,
               ),
             ),
             textAlign: TextAlign.center,
@@ -153,18 +163,25 @@ class _ThoughtText extends StatelessWidget {
           final tooTall = painter.height > maxH + 0.5;
           final tooWide = painter.didExceedMaxLines;
           if (!tooTall && !tooWide) break;
-          size -= 0.4;
+          size -= 0.35;
         }
-        return Text(
-          phrase,
-          textAlign: TextAlign.center,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: const Color(0xFF16181D),
-            fontSize: size,
-            fontWeight: FontWeight.w800,
-            height: 1.12,
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: maxW,
+            child: Text(
+              phrase,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: const Color(0xFF16181D),
+                fontSize: size,
+                fontWeight: FontWeight.w800,
+                height: 1.08,
+              ),
+            ),
           ),
         );
       },

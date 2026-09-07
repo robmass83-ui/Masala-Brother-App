@@ -55,13 +55,20 @@ const List<String> pennyThoughts = [
   'Piano geniale. Dettagli top secret.',
 ];
 
-/// Una frase per processo: cambia solo chiudendo e riaprendo l’app.
+/// Personaggio e frase per processo: cambiano solo chiudendo e riaprendo l’app.
 class PennySession {
   static String? _phrase;
+  static bool? _showPenny;
   static final _rng = math.Random();
+
+  /// `true` = Penny, `false` = Burns. Scelto una volta all’avvio.
+  static bool get showPenny => _showPenny ??= _rng.nextBool();
 
   static String get phrase =>
       _phrase ??= pennyThoughts[_rng.nextInt(pennyThoughts.length)];
 
-  static void resetForTest() => _phrase = null;
+  static void resetForTest({bool? showPenny}) {
+    _phrase = null;
+    _showPenny = showPenny;
+  }
 }

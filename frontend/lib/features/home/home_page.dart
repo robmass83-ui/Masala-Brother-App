@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +9,7 @@ import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/eccellente_badge.dart';
 import '../../core/widgets/penny_on_button.dart';
+import '../../core/widgets/penny_thoughts.dart';
 import '../../core/widgets/money_text.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/status_chip.dart';
@@ -329,56 +328,16 @@ class _OpenTaskCard extends StatelessWidget {
   }
 }
 
-class _HeroBalance extends StatefulWidget {
+class _HeroBalance extends StatelessWidget {
   const _HeroBalance({required this.colors, required this.snap});
 
   final AppColors colors;
   final BalanceSnapshot snap;
 
   @override
-  State<_HeroBalance> createState() => _HeroBalanceState();
-}
-
-class _HeroBalanceState extends State<_HeroBalance> {
-  bool _penny = false;
-  Timer? _swap;
-
-  bool get _canLoop {
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return false;
-    return !WidgetsBinding.instance.runtimeType
-        .toString()
-        .contains('TestWidgetsFlutterBinding');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_canLoop) return;
-      _armSwap();
-    });
-  }
-
-  void _armSwap() {
-    _swap?.cancel();
-    _swap = Timer(_penny ? const Duration(seconds: 11) : const Duration(seconds: 8), () {
-      if (!mounted) return;
-      setState(() => _penny = !_penny);
-      _armSwap();
-    });
-  }
-
-  @override
-  void dispose() {
-    _swap?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colors = widget.colors;
-    final snap = widget.snap;
     final even = snap.isEven;
+    final penny = PennySession.showPenny;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -402,7 +361,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
               ),
               const SizedBox(height: 2),
               Padding(
-                padding: const EdgeInsets.only(right: 86),
+                padding: EdgeInsets.only(right: penny ? 108 : 86),
                 child: Text(
                   even
                       ? 'Siete in pari'
@@ -419,7 +378,7 @@ class _HeroBalanceState extends State<_HeroBalance> {
               if (!even) ...[
                 const SizedBox(height: 4),
                 Padding(
-                  padding: const EdgeInsets.only(right: 86),
+                  padding: EdgeInsets.only(right: penny ? 108 : 86),
                   child: Text.rich(
                     TextSpan(
                       style: TextStyle(
@@ -492,16 +451,16 @@ class _HeroBalanceState extends State<_HeroBalance> {
               ),
             ],
           ),
-          if (!_penny)
+          if (!penny)
             const Positioned(
               right: -6,
               top: -6,
               child: IgnorePointer(child: EccellenteBadge(size: 64)),
             ),
-          if (_penny)
+          if (penny)
             const Positioned(
-              right: 2,
-              bottom: 20,
+              right: 0,
+              bottom: 18,
               child: IgnorePointer(child: PennyOnButton()),
             ),
         ],
