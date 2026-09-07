@@ -67,8 +67,8 @@ class PennySession {
   static String get phrase =>
       _phrase ??= pennyThoughts[_rng.nextInt(pennyThoughts.length)];
 
-  static void resetForTest({bool? showPenny}) {
-    _phrase = null;
+  static void resetForTest({bool? showPenny, String? phrase}) {
+    _phrase = phrase;
     _showPenny = showPenny;
   }
 }

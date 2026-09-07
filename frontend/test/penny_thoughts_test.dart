@@ -34,4 +34,10 @@ void main() {
     PennySession.resetForTest(showPenny: true);
     expect(PennySession.showPenny, isTrue);
   });
+
+  test('resetForTest can pin a thought phrase', () {
+    PennySession.resetForTest(phrase: 'Ho inseguito la coda. Persa.');
+    expect(PennySession.phrase, 'Ho inseguito la coda. Persa.');
+    expect(PennySession.phrase, 'Ho inseguito la coda. Persa.');
+  });
 }

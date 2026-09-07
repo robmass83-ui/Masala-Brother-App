@@ -4,9 +4,22 @@ import 'package:flutter/material.dart';
 
 import 'penny_thoughts.dart';
 
-/// Penny con le zampe sul bordo del bottone e nuvoletta grande, inclinata.
+/// Penny on the transfer button. The nuvoletta pops out of her mouth.
 class PennyOnButton extends StatefulWidget {
   const PennyOnButton({super.key});
+
+  static const Size layoutSize = Size(128, 88);
+
+  static const double _pennyRight = -4.9;
+  static const double _pennyBottom = 6.8;
+  static const double _pennySize = 85;
+  static const double _bubbleRight = 55.8;
+  static const double _bubbleTop = -4.1;
+  static const double _bubbleW = 146.2;
+  static const double _bubbleH = 68.4;
+  static const double _fontSize = 8.5;
+  static const double _textDx = -4.4;
+  static const double _textDy = 5.8;
 
   @override
   State<PennyOnButton> createState() => _PennyOnButtonState();
@@ -15,7 +28,11 @@ class PennyOnButton extends StatefulWidget {
 class _PennyOnButtonState extends State<PennyOnButton>
     with TickerProviderStateMixin {
   late final AnimationController _idle;
-  late final AnimationController _enter;
+  late final AnimationController _speak;
+
+  bool get _inTest => WidgetsBinding.instance.runtimeType
+      .toString()
+      .contains('TestWidgetsFlutterBinding');
 
   @override
   void initState() {
@@ -24,77 +41,94 @@ class _PennyOnButtonState extends State<PennyOnButton>
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     );
-    _enter = AnimationController(
+    _speak = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(milliseconds: 780),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_canLoop) {
         _idle.repeat(reverse: true);
-        _enter.forward();
+        _speak.forward();
       } else {
-        _enter.value = 1;
+        _speak.value = 1;
       }
     });
   }
 
   bool get _canLoop {
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return false;
-    return !WidgetsBinding.instance.runtimeType
-        .toString()
-        .contains('TestWidgetsFlutterBinding');
+    return !_inTest;
   }
 
   @override
   void dispose() {
     _idle.dispose();
-    _enter.dispose();
+    _speak.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_idle, _enter]),
+      animation: Listenable.merge([_idle, _speak]),
       builder: (context, _) {
-        final bob = math.sin(_idle.value * math.pi) * 1.8;
-        final appear = Curves.easeOut.transform(_enter.value);
+        final bob = math.sin(_idle.value * math.pi) * 1.6;
+        final t = _speak.value;
+        final emerge = _emerge(t);
+        final bubbleOpacity = _bubbleOpacity(t);
+        final textOpacity = _textOpacity(t);
+        final talk = t > 0.04 && t < 0.32
+            ? 1.0 + 0.07 * math.sin((t - 0.04) / 0.28 * math.pi)
+            : 1.0;
+        final fromMouth = Offset.lerp(
+          const Offset(36, 28),
+          Offset.zero,
+          emerge,
+        )!;
+        final scale = 0.08 + emerge * 0.92;
+
         return SizedBox(
-          width: 228,
-          height: 158,
+          key: const Key('penny-on-button'),
+          width: PennyOnButton.layoutSize.width,
+          height: PennyOnButton.layoutSize.height,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                right: 2,
-                bottom: 0,
+                right: PennyOnButton._pennyRight,
+                bottom: PennyOnButton._pennyBottom,
                 child: Transform.translate(
                   offset: Offset(0, -bob),
-                  child: Image.asset(
-                    'assets/mascot/penny.png',
-                    width: 82,
-                    height: 82,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    semanticLabel: 'Penny',
+                  child: Transform.scale(
+                    scale: talk,
+                    alignment: Alignment.bottomCenter,
+                    child: Image.asset(
+                      'assets/mascot/penny.png',
+                      width: PennyOnButton._pennySize,
+                      height: PennyOnButton._pennySize,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      semanticLabel: 'Penny',
+                    ),
                   ),
                 ),
               ),
               Positioned(
-                left: 0,
-                top: 0,
-                width: 178,
-                height: 126,
-                child: Opacity(
-                  opacity: appear,
-                  child: Transform.rotate(
-                    angle: -0.08,
-                    alignment: Alignment.bottomRight,
-                    child: Transform.scale(
-                      scale: 0.94 + appear * 0.06,
-                      alignment: Alignment.bottomRight,
-                      child: const _ThoughtBubble(),
+                right: PennyOnButton._bubbleRight,
+                top: PennyOnButton._bubbleTop,
+                width: PennyOnButton._bubbleW,
+                height: PennyOnButton._bubbleH,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: bubbleOpacity,
+                    child: Transform.translate(
+                      offset: fromMouth,
+                      child: Transform.scale(
+                        scale: scale,
+                        alignment: Alignment.bottomRight,
+                        child: _ThoughtBubble(textOpacity: textOpacity),
+                      ),
                     ),
                   ),
                 ),
@@ -105,10 +139,31 @@ class _PennyOnButtonState extends State<PennyOnButton>
       },
     );
   }
+
+  /// 0 at the mouth, 1 at the parked bubble.
+  static double _emerge(double t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return Curves.easeOutBack.transform(t).clamp(0.0, 1.06);
+  }
+
+  static double _bubbleOpacity(double t) {
+    if (t < 0.04) return 0;
+    if (t < 0.18) return (t - 0.04) / 0.14;
+    return 1;
+  }
+
+  static double _textOpacity(double t) {
+    if (t < 0.28) return 0;
+    if (t < 0.55) return (t - 0.28) / 0.27;
+    return 1;
+  }
 }
 
 class _ThoughtBubble extends StatelessWidget {
-  const _ThoughtBubble();
+  const _ThoughtBubble({required this.textOpacity});
+
+  final double textOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -117,14 +172,25 @@ class _ThoughtBubble extends StatelessWidget {
       children: [
         Image.asset(
           'assets/mascot/nuvoletta.png',
+          key: const Key('penny-nuvoletta'),
           fit: BoxFit.contain,
           alignment: Alignment.center,
           filterQuality: FilterQuality.high,
         ),
-        // Inset stays inside the white cloud, away from the scalloped edge.
-        const Padding(
-          padding: EdgeInsets.fromLTRB(40, 32, 46, 48),
-          child: Center(child: _ThoughtText()),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 10, 32, 22),
+          child: Center(
+            child: Opacity(
+              opacity: textOpacity,
+              child: Transform.translate(
+                offset: const Offset(
+                  PennyOnButton._textDx,
+                  PennyOnButton._textDy,
+                ),
+                child: const _ThoughtText(),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -137,54 +203,18 @@ class _ThoughtText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final phrase = PennySession.phrase;
-    return LayoutBuilder(
-      builder: (context, box) {
-        final maxW = box.maxWidth;
-        final maxH = box.maxHeight;
-        if (maxW <= 0 || maxH <= 0) return const SizedBox.shrink();
-        var size = 11.0;
-        TextPainter? painter;
-        while (size >= 6.0) {
-          painter = TextPainter(
-            text: TextSpan(
-              text: phrase,
-              style: TextStyle(
-                color: const Color(0xFF16181D),
-                fontSize: size,
-                fontWeight: FontWeight.w800,
-                height: 1.08,
-              ),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            ellipsis: '…',
-            textDirection: TextDirection.ltr,
-          )..layout(maxWidth: maxW);
-          final tooTall = painter.height > maxH + 0.5;
-          final tooWide = painter.didExceedMaxLines;
-          if (!tooTall && !tooWide) break;
-          size -= 0.35;
-        }
-        return FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: maxW,
-            child: Text(
-              phrase,
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: const Color(0xFF16181D),
-                fontSize: size,
-                fontWeight: FontWeight.w800,
-                height: 1.08,
-              ),
-            ),
-          ),
-        );
-      },
+    return Text(
+      phrase,
+      key: const Key('penny-thought-text'),
+      textAlign: TextAlign.center,
+      maxLines: 4,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: Color(0xFF16181D),
+        fontSize: PennyOnButton._fontSize,
+        fontWeight: FontWeight.w800,
+        height: 1.15,
+      ),
     );
   }
 }

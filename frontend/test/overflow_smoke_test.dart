@@ -390,6 +390,38 @@ void main() {
     expect(find.text('Interno'), findsOneWidget);
   });
 
+  testWidgets('Penny thought bubble stays fully on screen below the app bar',
+      (tester) async {
+    PennySession.resetForTest(
+      showPenny: true,
+      phrase: 'Ho inseguito la coda. Persa.',
+    );
+    await _pumpShell(
+      tester,
+      width: 390,
+      height: 844,
+      textScale: 1.0,
+      location: '/',
+      padding: const EdgeInsets.only(top: 47, bottom: 34),
+    );
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.text('Ho inseguito la coda. Persa.'), findsOneWidget);
+
+    final appBar = tester.getRect(find.byType(AppBar));
+    final bubble = tester.getRect(find.byKey(const Key('penny-nuvoletta')));
+    final text = tester.getRect(find.byKey(const Key('penny-thought-text')));
+    final screen = tester.getRect(find.byType(MaterialApp));
+
+    expect(bubble.top, greaterThanOrEqualTo(appBar.bottom - 0.5));
+    expect(bubble.left, greaterThanOrEqualTo(screen.left - 0.5));
+    expect(bubble.right, lessThanOrEqualTo(screen.right + 0.5));
+    expect(text.top, greaterThanOrEqualTo(bubble.top));
+    expect(text.bottom, lessThanOrEqualTo(bubble.bottom));
+    expect(text.left, greaterThanOrEqualTo(bubble.left));
+    expect(text.right, lessThanOrEqualTo(bubble.right));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('home empty state fits without scroll on a phone screen', (tester) async {
     await _pumpShell(
       tester,

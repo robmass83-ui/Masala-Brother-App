@@ -361,7 +361,7 @@ class _HeroBalance extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Padding(
-                padding: EdgeInsets.only(right: penny ? 108 : 86),
+                padding: const EdgeInsets.only(right: 86),
                 child: Text(
                   even
                       ? 'Siete in pari'
@@ -378,7 +378,7 @@ class _HeroBalance extends StatelessWidget {
               if (!even) ...[
                 const SizedBox(height: 4),
                 Padding(
-                  padding: EdgeInsets.only(right: penny ? 108 : 86),
+                  padding: const EdgeInsets.only(right: 86),
                   child: Text.rich(
                     TextSpan(
                       style: TextStyle(
@@ -427,7 +427,7 @@ class _HeroBalance extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 6),
+              SizedBox(height: penny && even ? 22 : 6),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -460,7 +460,7 @@ class _HeroBalance extends StatelessWidget {
           if (penny)
             const Positioned(
               right: 0,
-              bottom: 18,
+              top: 0,
               child: IgnorePointer(child: PennyOnButton()),
             ),
         ],
