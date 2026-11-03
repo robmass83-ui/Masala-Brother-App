@@ -193,15 +193,18 @@ class ReportPage extends ConsumerWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              Text(
-                'Bonifici',
-                style: TextStyle(
-                  color: c.ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  'Bonifici',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: c.ink,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
                 ),
               ),
-              const Spacer(),
               TextButton(
                 onPressed: () => context.push('/bonifici'),
                 child: Text('Vedi tutti', style: TextStyle(color: c.acc)),

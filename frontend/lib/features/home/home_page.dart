@@ -566,15 +566,25 @@ class _ShareBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Roberto ${(rob * 100).round()}%',
-              style: TextStyle(color: c.rob, fontWeight: FontWeight.w700, fontSize: 12),
+            Flexible(
+              child: Text(
+                'Roberto ${(rob * 100).round()}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: c.rob, fontWeight: FontWeight.w700, fontSize: 12),
+              ),
             ),
-            const Spacer(),
-            Text(
-              'Laura ${((1 - rob) * 100).round()}%',
-              style: TextStyle(color: c.lau, fontWeight: FontWeight.w700, fontSize: 12),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Laura ${((1 - rob) * 100).round()}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: TextStyle(color: c.lau, fontWeight: FontWeight.w700, fontSize: 12),
+              ),
             ),
           ],
         ),
