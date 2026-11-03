@@ -34,7 +34,8 @@ class ExpenseRepository {
       return Stream<List<Expense>>.multi((listener) {
         listener.add(_activeMemory());
         final sub = _memoryCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map((snap) {
@@ -75,7 +76,8 @@ class ExpenseRepository {
       return Stream<List<Expense>>.multi((listener) {
         listener.add(pick(_memory.values));
         final sub = _deletedCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map(
@@ -137,7 +139,7 @@ class ExpenseRepository {
   }
 
   Future<void> softDelete(String id, String actorUid) async {
-    final title = _titleOf(id);
+    final title = await _titleOf(id);
     if (!_live) {
       final current = _memory[id];
       if (current == null) return;
@@ -165,7 +167,7 @@ class ExpenseRepository {
   }
 
   Future<void> restore(String id, String actorUid) async {
-    final title = _titleOf(id);
+    final title = await _titleOf(id);
     if (!_live) {
       final current = _memory[id];
       if (current == null) return;
@@ -254,11 +256,11 @@ class ExpenseRepository {
     return snap.docs.map((d) => Expense.fromDoc(d.id, d.data())).toList();
   }
 
-  /// Soft-deletes without filling the trash (deleted 31+ days ago).
+  /// Bulk soft-delete used by the Excel import; items land in the trash.
   Future<int> retireMany(Iterable<String> ids, String actorUid) async {
     final unique = ids.where((id) => id.isNotEmpty).toSet();
     if (unique.isEmpty) return 0;
-    final stamp = DateTime.now().subtract(const Duration(days: 31));
+    final stamp = DateTime.now();
     var n = 0;
     if (!_live) {
       for (final id in unique) {
@@ -347,7 +349,16 @@ class ExpenseRepository {
     _deletedCtrl.add(_deletedMemory());
   }
 
-  String _titleOf(String id) => _memory[id]?.description ?? 'spesa';
+  Future<String> _titleOf(String id) async {
+    if (!_live) return _memory[id]?.description ?? 'spesa';
+    try {
+      final snap = await _col.doc(id).get();
+      final d = snap.data()?['description'] as String?;
+      return (d == null || d.trim().isEmpty) ? 'spesa' : d;
+    } catch (_) {
+      return 'spesa';
+    }
+  }
 
   Future<void> _log(
     ActivityType type,

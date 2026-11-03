@@ -34,7 +34,8 @@ class TransferRepository {
       return Stream<List<Transfer>>.multi((listener) {
         listener.add(_activeMemory());
         final sub = _memoryCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map((snap) {
@@ -60,7 +61,8 @@ class TransferRepository {
       return Stream<List<Transfer>>.multi((listener) {
         listener.add(pick(_memory.values));
         final sub = _deletedCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map(
@@ -154,7 +156,7 @@ class TransferRepository {
   Future<int> retireMany(Iterable<String> ids, String actorUid) async {
     final unique = ids.where((id) => id.isNotEmpty).toSet();
     if (unique.isEmpty) return 0;
-    final stamp = DateTime.now().subtract(const Duration(days: 31));
+    final stamp = DateTime.now();
     var n = 0;
     if (!_live) {
       for (final id in unique) {

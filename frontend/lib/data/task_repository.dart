@@ -42,7 +42,8 @@ class TaskRepository {
       return Stream<List<HouseholdTask>>.multi((listener) {
         listener.add(_activeMemory());
         final sub = _memoryCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map((snap) {
@@ -67,7 +68,8 @@ class TaskRepository {
       return Stream<List<HouseholdTask>>.multi((listener) {
         listener.add(pick(_memory.values));
         final sub = _deletedCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map(
@@ -174,7 +176,7 @@ class TaskRepository {
   }
 
   Future<void> softDelete(String id, String actorUid) async {
-    final title = _memory[id]?.title ?? 'cosa da fare';
+    final title = await _titleOf(id);
     if (!_live) {
       final current = _memory[id];
       if (current == null) return;
@@ -202,7 +204,7 @@ class TaskRepository {
   }
 
   Future<void> restore(String id, String actorUid) async {
-    final title = _memory[id]?.title ?? 'cosa da fare';
+    final title = await _titleOf(id);
     if (!_live) {
       final current = _memory[id];
       if (current == null) return;
@@ -229,12 +231,24 @@ class TaskRepository {
     );
   }
 
+  Future<String> _titleOf(String id) async {
+    if (!_live) return _memory[id]?.title ?? 'cosa da fare';
+    try {
+      final snap = await _col.doc(id).get();
+      final t = snap.data()?['title'] as String?;
+      return (t == null || t.trim().isEmpty) ? 'cosa da fare' : t;
+    } catch (_) {
+      return 'cosa da fare';
+    }
+  }
+
   Stream<List<TaskList>> watchLists() {
     if (!_live) {
       return Stream<List<TaskList>>.multi((listener) {
         listener.add(_activeLists());
         final sub = _listCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _listCol.snapshots().map((snap) {
@@ -258,7 +272,8 @@ class TaskRepository {
       return Stream<List<TaskList>>.multi((listener) {
         listener.add(pick(_listMemory.values));
         final sub = _deletedListCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _listCol.snapshots().map(
@@ -385,7 +400,7 @@ class TaskRepository {
   Future<int> retireLists(Iterable<String> ids, String actorUid) async {
     final unique = ids.where((id) => id.isNotEmpty).toSet();
     if (unique.isEmpty) return 0;
-    final stamp = DateTime.now().subtract(const Duration(days: 31));
+    final stamp = DateTime.now();
     var n = 0;
     if (!_live) {
       for (final id in unique) {
@@ -432,7 +447,7 @@ class TaskRepository {
   }) async {
     final unique = ids.where((id) => id.isNotEmpty).toSet();
     if (unique.isEmpty) return 0;
-    final stamp = DateTime.now().subtract(const Duration(days: 31));
+    final stamp = DateTime.now();
     var n = 0;
     if (col == null) {
       for (final id in unique) {

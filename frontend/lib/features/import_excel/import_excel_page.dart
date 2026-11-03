@@ -28,7 +28,7 @@ class _ImportExcelPageState extends ConsumerState<ImportExcelPage> {
   ExcelParseResult? _parsed;
   String? _fileName;
   String? _error;
-  bool _wipeManual = true;
+  bool _wipeManual = false;
   bool _busy = false;
   ExcelImportResult? _done;
 
@@ -81,6 +81,29 @@ class _ImportExcelPageState extends ConsumerState<ImportExcelPage> {
     final user = session?.user;
     final household = session?.household;
     if (parsed == null || user == null || household == null) return;
+    if (_wipeManual) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Eliminare i dati inseriti a mano?'),
+          content: const Text(
+            'Tutte le spese e i bonifici inseriti nell’app e tutte le cose da fare '
+            'finiranno nel Cestino. Potrai ripristinarli entro 30 giorni.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annulla'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Elimina e importa'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
 
     setState(() => _busy = true);
     try {
@@ -195,7 +218,7 @@ class _ImportExcelPageState extends ConsumerState<ImportExcelPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Elimina i dati di prova',
+                          'Elimina i dati inseriti a mano',
                           style: TextStyle(
                             color: c.ink,
                             fontWeight: FontWeight.w800,
@@ -204,7 +227,7 @@ class _ImportExcelPageState extends ConsumerState<ImportExcelPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Toglie spese, bonifici e cose da fare inseriti a mano, così restano solo i dati veri dell’Excel.',
+                          'Mette nel Cestino spese, bonifici e cose da fare inseriti nell’app, così restano solo i dati dell’Excel.',
                           style: TextStyle(
                             color: c.ink2,
                             fontWeight: FontWeight.w600,
@@ -457,7 +480,7 @@ class _DoneCard extends StatelessWidget {
           Text(
             '${result.insertedExpenses} spese e ${result.insertedTransfers} bonifici scritti.'
             '${result.skipped > 0 ? ' ${result.skipped} già presenti, non duplicati.' : ''}'
-            '${result.wiped > 0 ? ' ${result.wiped} voci di prova rimosse.' : ''}',
+            '${result.wiped > 0 ? ' ${result.wiped} voci spostate nel Cestino.' : ''}',
             style: TextStyle(
               color: colors.ink2,
               fontWeight: FontWeight.w600,

@@ -18,15 +18,25 @@ class MoneyFormat {
     return '$n EUR';
   }
 
+  /// Accepts Italian (`1.234,56`) and dot-decimal (`12.50`) input: the last
+  /// separator is the decimal point when followed by 1–2 digits, otherwise
+  /// separators are thousands (`1.234` = 1234).
   static int parseToCents(String raw) {
-    final cleaned = raw
-        .replaceAll('€', '')
-        .replaceAll(' ', '')
-        .replaceAll('.', '')
-        .replaceAll(',', '.')
-        .trim();
+    final cleaned = raw.replaceAll('€', '').replaceAll(' ', '').trim();
     if (cleaned.isEmpty) return 0;
-    final value = double.parse(cleaned);
+    final lastSep = cleaned.lastIndexOf(RegExp(r'[.,]'));
+    var intPart = cleaned;
+    var decPart = '';
+    if (lastSep >= 0) {
+      final tail = cleaned.substring(lastSep + 1);
+      final isComma = cleaned[lastSep] == ',';
+      if (isComma || (tail.isNotEmpty && tail.length <= 2)) {
+        intPart = cleaned.substring(0, lastSep);
+        decPart = tail;
+      }
+    }
+    intPart = intPart.replaceAll('.', '').replaceAll(',', '');
+    final value = double.parse('${intPart.isEmpty ? '0' : intPart}.${decPart.isEmpty ? '0' : decPart}');
     return (value * 100).round();
   }
 }

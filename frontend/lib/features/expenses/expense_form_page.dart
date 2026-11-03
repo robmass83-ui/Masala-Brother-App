@@ -57,6 +57,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   bool _loaded = false;
   bool _prefillApplied = false;
   bool _busy = false;
+  // Payer chips or paid amount changed by hand: on save, rebuild the
+  // payments from the form instead of keeping the existing ones.
+  bool _paymentsTouched = false;
+  bool _paidEdited = false;
 
   bool get _isEdit => widget.id != null;
 
@@ -89,11 +93,34 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _lauPartCents = e.paidLauCents;
     } else if (e.paidRobCents > 0) {
       _payer = _PayerChoice.rob;
+      _robPartCents = e.paidRobCents;
+      _paidCtrl.text = _plain(e.paidRobCents);
+      _paidEdited = e.paidRobCents != e.amountDueCents;
     } else if (e.paidLauCents > 0) {
       _payer = _PayerChoice.lau;
+      _lauPartCents = e.paidLauCents;
+      _paidCtrl.text = _plain(e.paidLauCents);
+      _paidEdited = e.paidLauCents != e.amountDueCents;
     } else {
       _payer = _PayerChoice.none;
     }
+  }
+
+  static String _plain(int cents) =>
+      MoneyFormat.fromCents(cents).replaceFirst('€', '').trim();
+
+  /// Keeps the single payer's paid amount equal to the total until the user
+  /// types a different paid amount.
+  void _syncSinglePayer() {
+    if (_paidEdited) return;
+    if (_payer == _PayerChoice.rob) {
+      _robPartCents = _amountCents;
+    } else if (_payer == _PayerChoice.lau) {
+      _lauPartCents = _amountCents;
+    } else {
+      return;
+    }
+    _paidCtrl.text = _plain(_amountCents);
   }
 
   void _syncSplit() {
@@ -186,9 +213,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   border: InputBorder.none,
                 ),
                 onChanged: (_) {
-                  if (_payer == _PayerChoice.both) {
-                    setState(_syncSplit);
+                  // Editing an expense: leave its payments alone unless the
+                  // user is also changing who paid.
+                  if (_isEdit && !_paymentsTouched && widget.prefill?.taskId == null) {
+                    return;
                   }
+                  setState(() {
+                    if (_payer == _PayerChoice.both) {
+                      _syncSplit();
+                    } else {
+                      _syncSinglePayer();
+                    }
+                  });
                 },
               ),
             ),
@@ -213,7 +249,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   context: context,
                   locale: const Locale('it', 'IT'),
                   initialDate: _date,
-                  firstDate: DateTime(2020),
+                  firstDate: _date.isBefore(DateTime(2020)) ? _date : DateTime(2020),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
                 if (picked != null) {
@@ -281,10 +317,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   selected: _payer == _PayerChoice.rob,
                   onTap: () => setState(() {
                     _payer = _PayerChoice.rob;
-                    _robPartCents = _amountCents;
-                    _paidCtrl.text = MoneyFormat.fromCents(_amountCents)
-                        .replaceFirst('€', '')
-                        .trim();
+                    _paymentsTouched = true;
+                    _paidEdited = false;
+                    _syncSinglePayer();
                   }),
                 ),
                 _ChoiceChip(
@@ -292,10 +327,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   selected: _payer == _PayerChoice.lau,
                   onTap: () => setState(() {
                     _payer = _PayerChoice.lau;
-                    _lauPartCents = _amountCents;
-                    _paidCtrl.text = MoneyFormat.fromCents(_amountCents)
-                        .replaceFirst('€', '')
-                        .trim();
+                    _paymentsTouched = true;
+                    _paidEdited = false;
+                    _syncSinglePayer();
                   }),
                 ),
                 _ChoiceChip(
@@ -303,6 +337,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   selected: _payer == _PayerChoice.both,
                   onTap: () => setState(() {
                     _payer = _PayerChoice.both;
+                    _paymentsTouched = true;
                     _syncSplit();
                   }),
                 ),
@@ -311,6 +346,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   selected: _payer == _PayerChoice.none,
                   onTap: () => setState(() {
                     _payer = _PayerChoice.none;
+                    _paymentsTouched = true;
                   }),
                 ),
               ],
@@ -334,6 +370,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     border: InputBorder.none,
                   ),
                   onChanged: (v) {
+                    _paymentsTouched = true;
+                    _paidEdited = true;
                     try {
                       final cents = MoneyFormat.parseToCents(v);
                       if (_payer == _PayerChoice.rob) {
@@ -426,7 +464,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final fromTask = taskId != null && taskId.isNotEmpty;
 
       final payments = <ExpensePayment>[];
-      if (fromTask || existing == null || existing.payments.isEmpty) {
+      if (fromTask ||
+          existing == null ||
+          existing.payments.isEmpty ||
+          _paymentsTouched) {
         if (_payer == _PayerChoice.rob) {
           final paid = _robPartCents > 0 ? _robPartCents : _amountCents;
           payments.add(

@@ -132,7 +132,7 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
                   context: context,
                   locale: const Locale('it', 'IT'),
                   initialDate: _date,
-                  firstDate: DateTime(2020),
+                  firstDate: _date.isBefore(DateTime(2020)) ? _date : DateTime(2020),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
                 if (picked != null) {
@@ -195,17 +195,26 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
     }
 
     setState(() => _busy = true);
-    await ref.read(transferRepositoryProvider).save(
-          draft: Transfer(
-            id: '',
-            fromUid: fromUid,
-            toUid: toUid,
-            amountCents: _amountCents,
-            date: _date,
-            note: _noteCtrl.text,
-          ),
-          actorUid: user.uid,
-        );
+    try {
+      await ref.read(transferRepositoryProvider).save(
+            draft: Transfer(
+              id: '',
+              fromUid: fromUid,
+              toUid: toUid,
+              amountCents: _amountCents,
+              date: _date,
+              note: _noteCtrl.text,
+            ),
+            actorUid: user.uid,
+          );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Salvataggio non riuscito. Riprova.')),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _busy = false;

@@ -96,7 +96,7 @@ class PeriodSelector extends StatelessWidget {
     final picked = await showDatePicker(
       context: context,
       initialDate: current,
-      firstDate: DateTime(2020),
+      firstDate: current.isBefore(DateTime(2000)) ? current : DateTime(2000),
       lastDate: now.add(const Duration(days: 366)),
       locale: const Locale('it', 'IT'),
     );

@@ -62,7 +62,8 @@ class AuthRepository {
           onError: listener.addError,
           onDone: listener.close,
         );
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     unawaited(restoreSession());

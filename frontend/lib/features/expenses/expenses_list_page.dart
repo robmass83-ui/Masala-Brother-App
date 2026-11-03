@@ -8,6 +8,7 @@ import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/person_avatar.dart';
+import '../../core/widgets/undo_snackbar.dart';
 import '../../data/balance_calculator.dart';
 import '../../data/data_providers.dart';
 import '../../data/expense_list_filter.dart';
@@ -232,7 +233,14 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
   }
 
   Future<void> _delete(Expense e, String uid) async {
-    await ref.read(expenseRepositoryProvider).softDelete(e.id, uid);
+    final repo = ref.read(expenseRepositoryProvider);
+    await repo.softDelete(e.id, uid);
+    if (!mounted) return;
+    showUndoSnackBar(
+      context,
+      message: 'Spesa eliminata',
+      onUndo: () => repo.restore(e.id, uid),
+    );
   }
 
   Future<void> _markPaid(Expense e, Household household, String uid) async {
@@ -477,7 +485,7 @@ class _ExpenseRow extends StatelessWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Eliminare la spesa?'),
-            content: const Text('La spesa verrà nascosta. Puoi sempre crearne un’altra.'),
+            content: const Text('Finisce nel Cestino: puoi ripristinarla entro 30 giorni.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),

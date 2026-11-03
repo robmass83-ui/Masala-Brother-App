@@ -276,7 +276,8 @@ class HouseholdRepository {
       return Stream<List<CatalogCategory>>.multi((listener) {
         listener.add(_activeCats());
         final sub = _catCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _categories.snapshots().map((snap) {
@@ -294,7 +295,8 @@ class HouseholdRepository {
       return Stream<List<CatalogProperty>>.multi((listener) {
         listener.add(_activeProps());
         final sub = _propCtrl.stream.listen(listener.add);
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _properties.snapshots().map((snap) {

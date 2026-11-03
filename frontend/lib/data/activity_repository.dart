@@ -28,7 +28,8 @@ class ActivityRepository {
         final sub = _memoryCtrl.stream.listen((list) {
           listener.add(list.take(limit).toList());
         });
-        listener.onCancel = sub.cancel;
+        // Not awaited: `.first` would wait on the broadcast cancel.
+        listener.onCancel = () => unawaited(sub.cancel());
       });
     }
     return _col.snapshots().map((snap) {

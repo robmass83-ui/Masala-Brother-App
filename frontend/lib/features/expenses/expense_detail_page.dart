@@ -11,6 +11,7 @@ import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/status_mapping.dart';
+import '../../core/widgets/undo_snackbar.dart';
 import '../../data/data_providers.dart';
 import '../../data/expense_models.dart';
 import '../auth/auth_models.dart';
@@ -173,13 +174,33 @@ class ExpenseDetailPage extends ConsumerWidget {
                       direction: DismissDirection.endToStart,
                       confirmDismiss: (_) async {
                         if (user == null || household == null) return false;
-                        await ref.read(expenseRepositoryProvider).removePayment(
-                              expense: expense,
-                              paymentId: p.id,
+                        final ok = await _confirm(
+                          context,
+                          title: 'Eliminare questo pagamento?',
+                          body: '${household.isLauUid(p.payerUid) ? 'Laura' : 'Roberto'} · '
+                              '${MoneyFormat.fromCents(p.amountCents)}',
+                        );
+                        if (!ok) return false;
+                        final repo = ref.read(expenseRepositoryProvider);
+                        await repo.removePayment(
+                          expense: expense,
+                          paymentId: p.id,
+                          actorUid: user.uid,
+                          robUid: household.robUid,
+                          lauUid: household.lauUid,
+                        );
+                        if (context.mounted) {
+                          showUndoSnackBar(
+                            context,
+                            message: 'Pagamento eliminato',
+                            onUndo: () => repo.save(
+                              draft: expense,
                               actorUid: user.uid,
                               robUid: household.robUid,
                               lauUid: household.lauUid,
-                            );
+                            ),
+                          );
+                        }
                         return false;
                       },
                       background: Container(
@@ -331,10 +352,47 @@ class ExpenseDetailPage extends ConsumerWidget {
     Expense expense,
     String uid,
   ) async {
+    final ok = await _confirm(
+      context,
+      title: 'Eliminare la spesa?',
+      body: 'Finisce nel Cestino: puoi ripristinarla entro 30 giorni.',
+    );
+    if (!ok) return;
     final repo = ref.read(expenseRepositoryProvider);
     await repo.softDelete(expense.id, uid);
-    if (context.mounted) context.go('/spese');
+    if (!context.mounted) return;
+    showUndoSnackBar(
+      context,
+      message: 'Spesa eliminata',
+      onUndo: () => repo.restore(expense.id, uid),
+    );
+    context.go('/spese');
   }
+}
+
+Future<bool> _confirm(
+  BuildContext context, {
+  required String title,
+  required String body,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('No'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Elimina'),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
 }
 
 class _SoftChip extends StatelessWidget {
