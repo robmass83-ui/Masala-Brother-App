@@ -25,6 +25,12 @@ class AppDateFormat {
     return DateFormat('MMMM yyyy', 'it_IT').format(date).toUpperCase();
   }
 
+  /// Sentence-case month header: `Novembre 2026`.
+  static String monthYearTitle(DateTime date) {
+    final s = DateFormat('MMMM yyyy', 'it_IT').format(date);
+    return s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+  }
+
   /// Full Italian weekday: `lunedì`.
   static String weekday(DateTime date) {
     return DateFormat('EEEE', 'it_IT').format(date);
