@@ -24,6 +24,17 @@ class ExpensePayment {
   final PaymentMethod method;
   final String? note;
 
+  ExpensePayment copyWith({String? payerUid, int? amountCents}) {
+    return ExpensePayment(
+      id: id,
+      payerUid: payerUid ?? this.payerUid,
+      amountCents: amountCents ?? this.amountCents,
+      date: date,
+      method: method,
+      note: note,
+    );
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'payerUid': payerUid,

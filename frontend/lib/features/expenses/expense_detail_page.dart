@@ -157,6 +157,11 @@ class ExpenseDetailPage extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               Text('Pagamenti', style: TextStyle(color: c.ink, fontWeight: FontWeight.w800, fontSize: 18)),
+              if (expense.payments.isNotEmpty)
+                Text(
+                  'Tocca per modificare, scorri a sinistra per eliminare.',
+                  style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
               const SizedBox(height: 8),
               if (expense.payments.isEmpty)
                 AppCard(
@@ -213,6 +218,9 @@ class ExpenseDetailPage extends ConsumerWidget {
                         child: Text('Elimina', style: TextStyle(color: c.due, fontWeight: FontWeight.w800)),
                       ),
                       child: AppCard(
+                        onTap: user == null || household == null
+                            ? null
+                            : () => _editPayment(context, ref, expense, p, user, household),
                         child: Row(
                           children: [
                             PersonAvatar(
@@ -291,6 +299,37 @@ class ExpenseDetailPage extends ConsumerWidget {
       robUid: household.robUid,
       lauUid: household.lauUid,
     );
+  }
+
+  Future<void> _editPayment(
+    BuildContext context,
+    WidgetRef ref,
+    Expense expense,
+    ExpensePayment payment,
+    AppUser user,
+    Household household,
+  ) async {
+    final isLau = household.isLauUid(payment.payerUid);
+    final draft = await askPayment(
+      context: context,
+      household: household,
+      suggestedCents: payment.amountCents,
+      title: 'Modifica pagamento',
+      initialRobCents: isLau ? 0 : payment.amountCents,
+      initialLauCents: isLau ? payment.amountCents : 0,
+    );
+    if (draft == null) return;
+    await ref.read(expenseRepositoryProvider).replacePayment(
+          expense: expense,
+          paymentId: payment.id,
+          parts: [
+            for (final p in draft.parts)
+              (payerUid: p.payerUid, amountCents: p.amountCents),
+          ],
+          actorUid: user.uid,
+          robUid: household.robUid,
+          lauUid: household.lauUid,
+        );
   }
 
   Future<void> _markPaid(

@@ -250,6 +250,77 @@ class ExpenseRepository {
     );
   }
 
+  /// Replaces one payment with [parts]. The part paid by the same person (or
+  /// the first part, if the payer changed) keeps the original id, date and
+  /// method; any extra part becomes a new payment in the same position.
+  Future<Expense> replacePayment({
+    required Expense expense,
+    required String paymentId,
+    required List<({String payerUid, int amountCents})> parts,
+    required String actorUid,
+    required String robUid,
+    required String lauUid,
+  }) {
+    final payments = <ExpensePayment>[];
+    for (final p in expense.payments) {
+      if (p.id != paymentId) {
+        payments.add(p);
+        continue;
+      }
+      final valid = parts.where((x) => x.amountCents > 0).toList();
+      var keeper = valid.indexWhere((x) => x.payerUid == p.payerUid);
+      if (keeper < 0 && valid.isNotEmpty) keeper = 0;
+      for (var i = 0; i < valid.length; i++) {
+        payments.add(
+          i == keeper
+              ? p.copyWith(
+                  payerUid: valid[i].payerUid,
+                  amountCents: valid[i].amountCents,
+                )
+              : newPayment(
+                  payerUid: valid[i].payerUid,
+                  amountCents: valid[i].amountCents,
+                ),
+        );
+      }
+    }
+    return save(
+      draft: expense.copyWith(payments: payments),
+      actorUid: actorUid,
+      robUid: robUid,
+      lauUid: lauUid,
+    );
+  }
+
+  /// Rebuilds [existing] so each payer in [targets] ends up having paid
+  /// exactly that amount. Payments already matching are kept as they are;
+  /// otherwise the payer's first payment is resized (keeping its date and
+  /// method) and the rest dropped. Payers missing from [targets] are removed.
+  List<ExpensePayment> reconcilePayments({
+    required List<ExpensePayment> existing,
+    required Map<String, int> targets,
+  }) {
+    final out = <ExpensePayment>[];
+    final handled = <String>{};
+    for (final p in existing) {
+      final target = targets[p.payerUid] ?? 0;
+      if (target <= 0) continue;
+      final mine = existing.where((x) => x.payerUid == p.payerUid);
+      final sum = mine.fold<int>(0, (s, x) => s + x.amountCents);
+      if (sum == target) {
+        out.add(p);
+      } else if (identical(mine.first, p)) {
+        out.add(p.copyWith(amountCents: target));
+      }
+      handled.add(p.payerUid);
+    }
+    for (final entry in targets.entries) {
+      if (entry.value <= 0 || handled.contains(entry.key)) continue;
+      out.add(newPayment(payerUid: entry.key, amountCents: entry.value));
+    }
+    return out;
+  }
+
   Future<List<Expense>> fetchAll() async {
     if (!_live) return _memory.values.toList();
     final snap = await _col.get();

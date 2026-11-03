@@ -8,10 +8,13 @@ import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/chip_wrap.dart';
+import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/data_providers.dart';
 import '../../data/expense_models.dart';
+import '../auth/auth_models.dart';
 import '../auth/auth_providers.dart';
+import 'payer_dialog.dart';
 
 enum _PayerChoice { rob, lau, both, none }
 
@@ -47,6 +50,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final _amountCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _paidCtrl = TextEditingController();
+  final _robPartCtrl = TextEditingController();
+  final _lauPartCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   String? _categoryId;
   String? _propertyId;
@@ -61,6 +66,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   // payments from the form instead of keeping the existing ones.
   bool _paymentsTouched = false;
   bool _paidEdited = false;
+  // "Entrambi" parts typed by hand: stop re-splitting them in half.
+  bool _splitEdited = false;
 
   bool get _isEdit => widget.id != null;
 
@@ -69,6 +76,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _amountCtrl.dispose();
     _descCtrl.dispose();
     _paidCtrl.dispose();
+    _robPartCtrl.dispose();
+    _lauPartCtrl.dispose();
     super.dispose();
   }
 
@@ -91,6 +100,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _payer = _PayerChoice.both;
       _robPartCents = e.paidRobCents;
       _lauPartCents = e.paidLauCents;
+      _robPartCtrl.text = _plain(e.paidRobCents);
+      _lauPartCtrl.text = _plain(e.paidLauCents);
+      _splitEdited = true;
     } else if (e.paidRobCents > 0) {
       _payer = _PayerChoice.rob;
       _robPartCents = e.paidRobCents;
@@ -124,9 +136,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   void _syncSplit() {
+    if (_splitEdited) return;
     final half = _amountCents ~/ 2;
     _robPartCents = half;
     _lauPartCents = _amountCents - half;
+    _robPartCtrl.text = _plain(_robPartCents);
+    _lauPartCtrl.text = _plain(_lauPartCents);
+  }
+
+  static int _parseOrZero(String raw) {
+    try {
+      return MoneyFormat.parseToCents(raw);
+    } catch (_) {
+      return 0;
+    }
   }
 
   @override
@@ -338,6 +361,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   onTap: () => setState(() {
                     _payer = _PayerChoice.both;
                     _paymentsTouched = true;
+                    _splitEdited = false;
                     _syncSplit();
                   }),
                 ),
@@ -372,25 +396,57 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   onChanged: (v) {
                     _paymentsTouched = true;
                     _paidEdited = true;
-                    try {
-                      final cents = MoneyFormat.parseToCents(v);
-                      if (_payer == _PayerChoice.rob) {
-                        _robPartCents = cents;
-                      } else {
-                        _lauPartCents = cents;
-                      }
-                    } catch (_) {}
+                    final cents = _parseOrZero(v);
+                    if (_payer == _PayerChoice.rob) {
+                      _robPartCents = cents;
+                    } else {
+                      _lauPartCents = cents;
+                    }
                   },
                 ),
               ),
             ],
             if (_payer == _PayerChoice.both) ...[
               const SizedBox(height: 10),
-              Text(
-                'Roberto ${MoneyFormat.fromCents(_robPartCents)} · '
-                'Laura ${MoneyFormat.fromCents(_lauPartCents)}',
-                style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600),
+              AppCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: PaymentPartField(
+                        person: PersonKey.rob,
+                        label: 'Pagato da Roberto',
+                        color: c.rob,
+                        controller: _robPartCtrl,
+                        onChanged: (v) => setState(() {
+                          _paymentsTouched = true;
+                          _splitEdited = true;
+                          _robPartCents = _parseOrZero(v);
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: PaymentPartField(
+                        person: PersonKey.lau,
+                        label: 'Pagato da Laura',
+                        color: c.lau,
+                        controller: _lauPartCtrl,
+                        onChanged: (v) => setState(() {
+                          _paymentsTouched = true;
+                          _splitEdited = true;
+                          _lauPartCents = _parseOrZero(v);
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 6),
+              if (_robPartCents + _lauPartCents > _amountCents)
+                Text(
+                  'Pagato ${MoneyFormat.fromCents(_robPartCents + _lauPartCents - _amountCents)} in più della spesa',
+                  style: TextStyle(color: c.due, fontWeight: FontWeight.w700),
+                ),
               if (_robPartCents + _lauPartCents < _amountCents)
                 Text(
                   'Manca ${MoneyFormat.fromCents(_amountCents - _robPartCents - _lauPartCents)}',
@@ -432,11 +488,43 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
+  /// How much each person paid according to the form. A single payer who
+  /// never typed a paid amount paid the whole expense.
+  Map<String, int> _paidTargets(Household household) {
+    return switch (_payer) {
+      _PayerChoice.rob => {
+          household.robUid: _paidEdited ? _robPartCents : _amountCents,
+        },
+      _PayerChoice.lau => {
+          household.lauUid: _paidEdited ? _lauPartCents : _amountCents,
+        },
+      _PayerChoice.both => {
+          household.robUid: _robPartCents,
+          household.lauUid: _lauPartCents,
+        },
+      _PayerChoice.none => const {},
+    };
+  }
+
   Future<void> _save() async {
     final desc = _descCtrl.text.trim();
     if (desc.isEmpty || _amountCents <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Servono importo e descrizione')),
+      );
+      return;
+    }
+    final paidNothing = switch (_payer) {
+      _PayerChoice.rob => _paidEdited && _robPartCents <= 0,
+      _PayerChoice.lau => _paidEdited && _lauPartCents <= 0,
+      _PayerChoice.both => _robPartCents + _lauPartCents <= 0,
+      _PayerChoice.none => false,
+    };
+    if (_paymentsTouched && paidNothing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Metti quanto è stato pagato, oppure scegli “Nessuno ancora”'),
+        ),
       );
       return;
     }
@@ -463,42 +551,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           : await repo.watchExpense(expenseId).first;
       final fromTask = taskId != null && taskId.isNotEmpty;
 
-      final payments = <ExpensePayment>[];
-      if (fromTask ||
-          existing == null ||
-          existing.payments.isEmpty ||
-          _paymentsTouched) {
-        if (_payer == _PayerChoice.rob) {
-          final paid = _robPartCents > 0 ? _robPartCents : _amountCents;
-          payments.add(
-            repo.newPayment(payerUid: household.robUid, amountCents: paid),
-          );
-        } else if (_payer == _PayerChoice.lau) {
-          final paid = _lauPartCents > 0 ? _lauPartCents : _amountCents;
-          payments.add(
-            repo.newPayment(payerUid: household.lauUid, amountCents: paid),
-          );
-        } else if (_payer == _PayerChoice.both) {
-          if (_robPartCents > 0) {
-            payments.add(
-              repo.newPayment(
-                payerUid: household.robUid,
-                amountCents: _robPartCents,
-              ),
-            );
-          }
-          if (_lauPartCents > 0) {
-            payments.add(
-              repo.newPayment(
-                payerUid: household.lauUid,
-                amountCents: _lauPartCents,
-              ),
-            );
-          }
-        }
-      } else {
-        payments.addAll(existing.payments);
-      }
+      // Payments already there keep their date and method; only the
+      // amounts that changed are touched.
+      final payments = (fromTask ||
+              existing == null ||
+              existing.payments.isEmpty ||
+              _paymentsTouched)
+          ? repo.reconcilePayments(
+              existing: existing?.payments ?? const [],
+              targets: _paidTargets(household),
+            )
+          : existing.payments;
 
       final sameDay = existing != null &&
           existing.date.year == _date.year &&
