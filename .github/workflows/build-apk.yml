@@ -23,6 +23,9 @@ jobs:
           flutter-version: '3.47.2'
           cache: true
 
+      # Caches Gradle's downloads and build outputs between releases.
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Stub Firebase options for analyze
         run: cp lib/firebase_options.example.dart lib/firebase_options.dart
 
@@ -60,7 +63,8 @@ jobs:
             "keyAlias=$KEY_ALIAS" \
             "storeFile=upload-keystore.jks" > android/key.properties
 
-      - run: flutter build apk --release --split-per-abi
+      # Only the two phone ABIs that are attached to the release; x86_64 is never uploaded.
+      - run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
 
       - uses: softprops/action-gh-release@v2
         with:
