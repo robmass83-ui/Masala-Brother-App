@@ -331,6 +331,12 @@ class _OpenTaskCard extends StatelessWidget {
 class _HeroBalance extends StatelessWidget {
   const _HeroBalance({required this.colors, required this.snap});
 
+  /// Penny's box sits on the button, measured from the card's bottom edge.
+  static const double _pennyBottomOnButton = 15;
+
+  /// Gap above the button that holds the nuvoletta, so it never covers text.
+  static const double _pennyBubbleClearance = 74;
+
   final AppColors colors;
   final BalanceSnapshot snap;
 
@@ -427,7 +433,7 @@ class _HeroBalance extends StatelessWidget {
                   ),
                 ),
               ],
-              SizedBox(height: penny && even ? 22 : 6),
+              SizedBox(height: penny ? _pennyBubbleClearance : 6),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -460,7 +466,7 @@ class _HeroBalance extends StatelessWidget {
           if (penny)
             const Positioned(
               right: 0,
-              top: 0,
+              bottom: _pennyBottomOnButton,
               child: IgnorePointer(child: PennyOnButton()),
             ),
         ],

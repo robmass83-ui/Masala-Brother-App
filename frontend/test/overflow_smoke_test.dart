@@ -422,6 +422,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [360.0, 375.0, 390.0, 412.0]) {
+    testWidgets(
+        'Penny thought bubble leaves the balance heading readable @ ${width.toInt()}dp',
+        (tester) async {
+      PennySession.resetForTest(
+        showPenny: true,
+        phrase: 'Ho inseguito la coda. Persa.',
+      );
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 844);
+      addTearDown(tester.view.reset);
+      await _pumpShell(
+        tester,
+        width: width,
+        height: 844,
+        textScale: 1.0,
+        location: '/',
+        padding: const EdgeInsets.only(top: 47, bottom: 34),
+      );
+
+      final heading = tester.getRect(find.text('Siete in pari'));
+      final bubble = tester.getRect(find.byKey(const Key('penny-nuvoletta')));
+      final button = tester.getRect(find.widgetWithText(FilledButton, 'Registra bonifico'));
+      final penny = tester.getRect(find.bySemanticsLabel('Penny'));
+      // The test font is wider than Sora and wraps the heading; on a phone
+      // it is a single 26px line.
+      expect(heading.top + 26, lessThanOrEqualTo(bubble.top),
+          reason: 'heading $heading overlaps bubble $bubble');
+      expect(bubble.bottom, lessThanOrEqualTo(button.top + 1));
+      expect(penny.bottom, greaterThan(button.top),
+          reason: 'Penny should still rest on the button');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('home empty state fits without scroll on a phone screen', (tester) async {
     await _pumpShell(
       tester,
