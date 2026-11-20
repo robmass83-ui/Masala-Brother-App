@@ -140,7 +140,6 @@ class ExcelExporter {
       'DATA',
       'CATEGORIA',
       'IMMOBILE',
-      'ID',
     ];
     for (var i = 0; i < headers.length; i++) {
       text(i, headerRow, headers[i], style: headerStyle);
@@ -167,10 +166,9 @@ class ExcelExporter {
       );
       text(7, r, row.category);
       text(8, r, row.property);
-      text(9, r, row.id);
     }
 
-    const widths = [42.0, 14.0, 14.0, 14.0, 14.0, 14.0, 14.0, 22.0, 18.0, 16.0];
+    const widths = [42.0, 14.0, 14.0, 14.0, 14.0, 14.0, 14.0, 22.0, 18.0];
     for (var i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }
@@ -193,8 +191,6 @@ class ExcelExporter {
       'IMPORTO',
       'METODO',
       'NOTA',
-      'ID SPESA',
-      'ID PAGAMENTO',
     ];
     for (var i = 0; i < titles.length; i++) {
       sheet.updateCell(
@@ -211,8 +207,6 @@ class ExcelExporter {
       int cents,
       String method,
       String note,
-      String expenseId,
-      String paymentId,
     })>[];
     for (final e in expenses) {
       for (final p in e.payments) {
@@ -225,8 +219,6 @@ class ExcelExporter {
           cents: p.amountCents,
           method: paymentMethodLabel(p.method),
           note: p.note ?? '',
-          expenseId: e.id,
-          paymentId: p.id,
         ));
       }
     }
@@ -261,17 +253,9 @@ class ExcelExporter {
         CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: r),
         TextCellValue(p.note),
       );
-      sheet.updateCell(
-        CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: r),
-        TextCellValue(p.expenseId),
-      );
-      sheet.updateCell(
-        CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: r),
-        TextCellValue(p.paymentId),
-      );
     }
 
-    const widths = [14.0, 42.0, 14.0, 14.0, 14.0, 24.0, 16.0, 16.0];
+    const widths = [14.0, 42.0, 14.0, 14.0, 14.0, 24.0];
     for (var i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }
@@ -293,7 +277,6 @@ class ExcelExporter {
       'IMMOBILE',
       'FATTA',
       'NOTE',
-      'ID',
     ];
     for (var i = 0; i < titles.length; i++) {
       sheet.updateCell(
@@ -343,12 +326,8 @@ class ExcelExporter {
         CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: r),
         TextCellValue(t.notes ?? ''),
       );
-      sheet.updateCell(
-        CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: r),
-        TextCellValue(t.id),
-      );
     }
-    const widths = [40.0, 14.0, 16.0, 18.0, 10.0, 28.0, 16.0];
+    const widths = [40.0, 14.0, 16.0, 18.0, 10.0, 28.0];
     for (var i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }

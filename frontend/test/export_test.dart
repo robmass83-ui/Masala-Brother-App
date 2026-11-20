@@ -162,7 +162,9 @@ void main() {
 
     expect(at('A4'), TextCellValue('DETTAGLIO SPESA'));
     expect(at('B4'), TextCellValue('DA PAGARE'));
-    expect(at('J4'), TextCellValue('ID'));
+    expect(at('I4'), TextCellValue('IMMOBILE'));
+    // No technical id columns: they read as gibberish in the backup.
+    expect(at('J4'), isNull);
 
     expect(at('A5'), TextCellValue('Bolletta luce'));
     expect(money('B5'), 100);
