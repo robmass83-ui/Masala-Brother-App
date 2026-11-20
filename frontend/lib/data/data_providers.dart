@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/backup/drive_backup.dart';
 import '../core/utils/money_format.dart';
 import '../features/auth/auth_providers.dart';
 import 'activity_models.dart';
@@ -39,7 +40,8 @@ final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
   final repo = ExpenseRepository(
     firestore: ref.watch(firestoreProvider),
     activity: ref.watch(activityRepositoryProvider),
-  );
+  )..onMoneyChanged =
+      () => ref.read(driveBackupProvider.notifier).notifyMoneyChanged();
   ref.onDispose(repo.dispose);
   return repo;
 });
@@ -48,7 +50,8 @@ final transferRepositoryProvider = Provider<TransferRepository>((ref) {
   final repo = TransferRepository(
     firestore: ref.watch(firestoreProvider),
     activity: ref.watch(activityRepositoryProvider),
-  );
+  )..onMoneyChanged =
+      () => ref.read(driveBackupProvider.notifier).notifyMoneyChanged();
   ref.onDispose(repo.dispose);
   return repo;
 });

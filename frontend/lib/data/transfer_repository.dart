@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
@@ -24,6 +25,18 @@ class TransferRepository {
   final _deletedCtrl = StreamController<List<Transfer>>.broadcast();
 
   bool get _live => _db != null;
+
+  /// Called after any change to money data made from this phone (used to
+  /// refresh the Excel backup in Google Drive).
+  void Function()? onMoneyChanged;
+
+  void _moneyChanged() {
+    try {
+      onMoneyChanged?.call();
+    } catch (e) {
+      debugPrint('onMoneyChanged: $e');
+    }
+  }
 
   CollectionReference<Map<String, dynamic>> get _col => _db!
       .collection('households')
@@ -103,6 +116,7 @@ class TransferRepository {
           'Ha registrato un bonifico',
         );
       }
+      _moneyChanged();
       return withId;
     }
 
@@ -118,6 +132,7 @@ class TransferRepository {
         'Ha registrato un bonifico',
       );
     }
+    _moneyChanged();
     return withId;
   }
 
@@ -133,6 +148,7 @@ class TransferRepository {
         actorUid,
         'Ha messo un bonifico nel cestino',
       );
+      _moneyChanged();
       return;
     }
     await localFirst(_col.doc(id).set({
@@ -146,6 +162,7 @@ class TransferRepository {
       actorUid,
       'Ha messo un bonifico nel cestino',
     );
+    _moneyChanged();
   }
 
   Future<List<Transfer>> fetchAll() async {
@@ -167,6 +184,7 @@ class TransferRepository {
         n++;
       }
       if (n > 0) _emitMemory();
+      _moneyChanged();
       return n;
     }
     const chunk = 400;
@@ -188,6 +206,7 @@ class TransferRepository {
       }
       await batch.commit();
     }
+    _moneyChanged();
     return n;
   }
 
@@ -198,6 +217,7 @@ class TransferRepository {
         _memory[t.id] = t;
       }
       _emitMemory();
+      _moneyChanged();
       return;
     }
     const chunk = 400;
@@ -213,6 +233,7 @@ class TransferRepository {
       }
       await batch.commit();
     }
+    _moneyChanged();
   }
 
   Future<void> restore(String id, String actorUid) async {
@@ -227,6 +248,7 @@ class TransferRepository {
         actorUid,
         'Ha ripristinato un bonifico',
       );
+      _moneyChanged();
       return;
     }
     await localFirst(_col.doc(id).set({
@@ -240,6 +262,7 @@ class TransferRepository {
       actorUid,
       'Ha ripristinato un bonifico',
     );
+    _moneyChanged();
   }
 
   List<Transfer> _activeMemory() =>

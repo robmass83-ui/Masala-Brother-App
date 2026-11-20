@@ -10,6 +10,7 @@ import '../features/auth/private_app_page.dart';
 import '../features/export/export_page.dart';
 import '../features/home/home_page.dart';
 import '../features/report/report_page.dart';
+import '../features/settings/drive_backup_page.dart';
 import '../features/settings/activity_page.dart';
 import '../features/settings/appearance_page.dart';
 import '../features/settings/catalog_page.dart';
@@ -188,6 +189,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'attivita',
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (context, state) => const ActivityPage(),
+                  ),
+                  GoRoute(
+                    path: 'backup',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const DriveBackupPage(),
                   ),
                   GoRoute(
                     path: 'cestino',

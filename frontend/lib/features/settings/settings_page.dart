@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/backup/drive_backup.dart';
 import '../../core/config/app_config.dart';
 import '../../core/connectivity/connectivity_provider.dart';
 import '../../core/prefs/settings_providers.dart';
@@ -52,6 +53,7 @@ class SettingsPage extends ConsumerWidget {
     final propPreview = props.take(3).map((p) => p.name).join(', ');
     final catPreview = cats.take(3).map((c) => c.name.split(' ').first).join(', ');
     final trashCount = ref.watch(trashItemsProvider).length;
+    final backup = ref.watch(driveBackupProvider);
 
     final otherName = person == PersonKey.rob ? 'Laura' : 'Roberto';
     final syncLabel = online
@@ -160,6 +162,18 @@ class SettingsPage extends ConsumerWidget {
                 leading: const SettingsIcon(Icons.table_chart_outlined),
                 title: 'Esporta Excel / PDF',
                 onTap: () => context.push('/esporta'),
+              ),
+              SettingsTile(
+                leading: const SettingsIcon(Icons.cloud_upload_outlined),
+                title: 'Backup su Google Drive',
+                subtitle: !backup.enabled
+                    ? 'Spento'
+                    : backup.error != null
+                        ? 'Da controllare'
+                        : backup.lastBackupAt == null
+                            ? 'Acceso'
+                            : 'Aggiornato ${AppDateFormat.relative(backup.lastBackupAt!)}',
+                onTap: () => context.push('/altro/backup'),
               ),
               SettingsTile(
                 leading: const SettingsIcon(Icons.swap_vert),

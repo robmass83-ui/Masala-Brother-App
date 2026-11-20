@@ -177,6 +177,37 @@ class AuthRepository {
     return _mapFirebaseUser(cred.user);
   }
 
+  /// Only files this app creates: it can't see anything else in Drive.
+  static const driveFileScope = 'https://www.googleapis.com/auth/drive.file';
+
+  Future<GoogleSignInAccount?> _googleAccount() async {
+    return _googleSignIn.currentUser ?? await _googleSignIn.signInSilently();
+  }
+
+  /// Asks Google for permission to write the backup file in Drive. Already
+  /// granted: returns true without showing anything.
+  Future<bool> requestDriveAccess() async {
+    if (_demoMode) return true;
+    try {
+      final account = await _googleAccount();
+      if (account == null) return false;
+      return await _googleSignIn.requestScopes([driveFileScope]);
+    } catch (e, st) {
+      debugPrint('Drive access: $e\n$st');
+      return false;
+    }
+  }
+
+  /// Authorization headers for Drive calls. The scope is re-requested
+  /// first: after an app restart the token would otherwise lack it.
+  Future<Map<String, String>> driveAuthHeaders() async {
+    final account = await _googleAccount();
+    if (account == null || !await requestDriveAccess()) {
+      throw StateError('Accesso Google non disponibile');
+    }
+    return (_googleSignIn.currentUser ?? account).authHeaders;
+  }
+
   /// Dev helper: simulate an unauthorized Google account.
   Future<AuthSession> signInUnauthorizedDemo() async {
     _demoSession = AuthSession(

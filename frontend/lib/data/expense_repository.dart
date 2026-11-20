@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
@@ -24,6 +25,18 @@ class ExpenseRepository {
   final _deletedCtrl = StreamController<List<Expense>>.broadcast();
 
   bool get _live => _db != null;
+
+  /// Called after any change to money data made from this phone (used to
+  /// refresh the Excel backup in Google Drive).
+  void Function()? onMoneyChanged;
+
+  void _moneyChanged() {
+    try {
+      onMoneyChanged?.call();
+    } catch (e) {
+      debugPrint('onMoneyChanged: $e');
+    }
+  }
 
   CollectionReference<Map<String, dynamic>> get _col => _db!
       .collection('households')
@@ -124,6 +137,7 @@ class ExpenseRepository {
             ? 'Ha aggiunto “${withId.description}”'
             : 'Ha modificato “${withId.description}”',
       );
+      _moneyChanged();
       return withId;
     }
 
@@ -136,6 +150,7 @@ class ExpenseRepository {
           ? 'Ha aggiunto “${withId.description}”'
           : 'Ha modificato “${withId.description}”',
     );
+    _moneyChanged();
     return withId;
   }
 
@@ -152,6 +167,7 @@ class ExpenseRepository {
         actorUid,
         'Ha messo nel cestino “$title”',
       );
+      _moneyChanged();
       return;
     }
     await localFirst(_col.doc(id).set({
@@ -165,6 +181,7 @@ class ExpenseRepository {
       actorUid,
       'Ha messo nel cestino “$title”',
     );
+    _moneyChanged();
   }
 
   Future<void> restore(String id, String actorUid) async {
@@ -180,6 +197,7 @@ class ExpenseRepository {
         actorUid,
         'Ha ripristinato “$title”',
       );
+      _moneyChanged();
       return;
     }
     await localFirst(_col.doc(id).set({
@@ -193,6 +211,7 @@ class ExpenseRepository {
       actorUid,
       'Ha ripristinato “$title”',
     );
+    _moneyChanged();
   }
 
   Future<Expense> addPayment({
@@ -356,6 +375,7 @@ class ExpenseRepository {
         n++;
       }
       if (n > 0) _emitMemory();
+      _moneyChanged();
       return n;
     }
     const chunk = 400;
@@ -377,6 +397,7 @@ class ExpenseRepository {
       }
       await batch.commit();
     }
+    _moneyChanged();
     return n;
   }
 
@@ -387,6 +408,7 @@ class ExpenseRepository {
         _memory[e.id] = e;
       }
       _emitMemory();
+      _moneyChanged();
       return;
     }
     const chunk = 400;
@@ -402,6 +424,7 @@ class ExpenseRepository {
       }
       await batch.commit();
     }
+    _moneyChanged();
   }
 
   ExpensePayment newPayment({
