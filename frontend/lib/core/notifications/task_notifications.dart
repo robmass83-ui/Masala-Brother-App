@@ -17,7 +17,6 @@ class TaskNotifications {
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
-  static final Set<int> _scheduledTaskIds = <int>{};
   static bool _ready = false;
 
   /// Set from the update probe so tapping the system notification opens the APK dialog.
@@ -111,18 +110,37 @@ class TaskNotifications {
     return id;
   }
 
+  /// Last schedule applied, so rebuilds with the same tasks do nothing.
+  static String? _lastScheduleKey;
+  static Future<void> _syncChain = Future<void>.value();
+
+  /// Reschedules reminders. Calls are serialized (two overlapping syncs used
+  /// to clash), and alarms are cancelled from the system's own pending list,
+  /// so reminders left from before an app restart for tasks done, deleted or
+  /// reassigned meanwhile no longer fire.
   static Future<void> sync({
     required List<HouseholdTask> tasks,
     required String currentUid,
     int hour = 9,
+  }) {
+    _syncChain = _syncChain
+        .then((_) => _sync(tasks: tasks, currentUid: currentUid, hour: hour))
+        .catchError((Object e) {
+      debugPrint('TaskNotifications sync: $e');
+    });
+    return _syncChain;
+  }
+
+  static Future<void> _sync({
+    required List<HouseholdTask> tasks,
+    required String currentUid,
+    required int hour,
   }) async {
     if (!_ready) return;
     try {
-      for (final id in _scheduledTaskIds) {
-        await _plugin.cancel(id);
-      }
-      _scheduledTaskIds.clear();
       final loc = tz.getLocation('Europe/Rome');
+      final now = tz.TZDateTime.now(loc);
+      final wanted = <({int id, String taskId, String title, tz.TZDateTime at})>[];
       for (final task in tasks) {
         if (task.done || task.isDeleted) continue;
         final assignee = task.assigneeUid;
@@ -140,13 +158,29 @@ class TaskNotifications {
           when.day,
           when.hour,
         );
-        if (!scheduled.isAfter(tz.TZDateTime.now(loc))) continue;
-        final id = _taskNotificationId(task.id);
+        if (!scheduled.isAfter(now)) continue;
+        wanted.add((
+          id: _taskNotificationId(task.id),
+          taskId: task.id,
+          title: task.title,
+          at: scheduled,
+        ));
+      }
+      final key = (wanted.map((w) => '${w.id}|${w.at}|${w.title}').toList()..sort())
+          .join(';');
+      if (key == _lastScheduleKey) return;
+
+      final pending = await _plugin.pendingNotificationRequests();
+      for (final p in pending) {
+        if (p.id == updateNotificationId) continue;
+        await _plugin.cancel(p.id);
+      }
+      for (final w in wanted) {
         await _plugin.zonedSchedule(
-          id,
+          w.id,
           'Promemoria',
-          task.title,
-          scheduled,
+          w.title,
+          w.at,
           const NotificationDetails(
             android: AndroidNotificationDetails(
               'task_reminders',
@@ -157,10 +191,10 @@ class TaskNotifications {
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          payload: task.id,
+          payload: w.taskId,
         );
-        _scheduledTaskIds.add(id);
       }
+      _lastScheduleKey = key;
     } catch (e, st) {
       debugPrint('TaskNotifications sync: $e\n$st');
     }

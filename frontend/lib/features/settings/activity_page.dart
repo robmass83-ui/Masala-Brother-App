@@ -16,13 +16,16 @@ class ActivityPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.colors;
-    final items = ref.watch(activityProvider).valueOrNull ?? const <ActivityEntry>[];
+    final async = ref.watch(visibleActivityProvider);
+    final items = async.valueOrNull ?? const <ActivityEntry>[];
     final household = ref.watch(authSessionProvider).valueOrNull?.household;
 
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(title: const Text('Attività')),
-      body: items.isEmpty
+      body: items.isEmpty && async.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : items.isEmpty
           ? ListView(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
               children: const [

@@ -8,6 +8,8 @@ import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/chip_wrap.dart';
+import '../../core/widgets/discard_guard.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/data_providers.dart';
@@ -68,8 +70,25 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   bool _paidEdited = false;
   // "Entrambi" parts typed by hand: stop re-splitting them in half.
   bool _splitEdited = false;
+  // Form contents right after loading, to tell whether leaving loses input.
+  Object? _initial;
 
   bool get _isEdit => widget.id != null;
+
+  Object _snapshot() => (
+        _amountCtrl.text,
+        _descCtrl.text,
+        _date,
+        _categoryId,
+        _propertyId,
+        _shareRob,
+        _payer,
+        _paidCtrl.text,
+        _robPartCtrl.text,
+        _lauPartCtrl.text,
+      );
+
+  bool _isDirty() => _initial != null && _snapshot() != _initial;
 
   @override
   void dispose() {
@@ -157,9 +176,35 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final c = context.colors;
     final cats = ref.watch(categoriesProvider).valueOrNull ?? const <CatalogCategory>[];
     final props = ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[];
-    final existing = widget.id == null
-        ? null
-        : ref.watch(expenseProvider(widget.id!)).valueOrNull;
+    final existingAsync =
+        widget.id == null ? null : ref.watch(expenseProvider(widget.id!));
+    final existing = existingAsync?.valueOrNull;
+
+    // Editing something not loaded yet, or gone (deleted meanwhile): never
+    // show an empty form whose save would overwrite or resurrect it.
+    if (_isEdit && !_loaded && existing == null) {
+      final missing = existingAsync != null && !existingAsync.isLoading;
+      return Scaffold(
+        backgroundColor: c.bg,
+        appBar: AppBar(
+          title: const Text('Modifica spesa'),
+          leading: IconButton(
+            tooltip: 'Indietro',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => DiscardGuard.back(context),
+          ),
+        ),
+        body: missing
+            ? const Padding(
+                padding: EdgeInsets.all(16),
+                child: EmptyState(
+                  message: 'Spesa non trovata: forse è stata eliminata. '
+                      'La trovi nel Cestino, in Altro.',
+                ),
+              )
+            : const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (_isEdit && existing != null && !_loaded) {
       _fillFrom(existing);
@@ -182,8 +227,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       }
     }
     _categoryId ??= cats.isEmpty ? 'altro' : cats.first.id;
+    _initial ??= _snapshot();
 
-    return Scaffold(
+    return DiscardGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
         backgroundColor: c.bg,
         appBar: AppBar(
           title: Text(
@@ -194,8 +242,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     : 'Nuova spesa',
           ),
           leading: IconButton(
+            tooltip: 'Indietro',
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+            onPressed: () => DiscardGuard.back(context),
           ),
         ),
         bottomNavigationBar: Material(
@@ -239,7 +288,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   // Editing an expense: leave its payments alone unless the
                   // user is also changing who paid.
                   if (_isEdit && !_paymentsTouched && widget.prefill?.taskId == null) {
-                    return;
+                    // Exception: one person had paid the whole amount, so
+                    // the paid amount follows the corrected total.
+                    final followsTotal = !_paidEdited &&
+                        (_payer == _PayerChoice.rob || _payer == _PayerChoice.lau);
+                    if (!followsTotal) return;
+                    _paymentsTouched = true;
                   }
                   setState(() {
                     if (_payer == _PayerChoice.both) {
@@ -485,6 +539,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             ),
           ],
         ),
+      ),
     );
   }
 
@@ -531,7 +586,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final session = ref.read(authSessionProvider).valueOrNull;
     final user = session?.user;
     final household = session?.household;
-    if (user == null || household == null) return;
+    if (user == null || household == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessione non pronta: riprova tra un attimo.')),
+      );
+      return;
+    }
 
     setState(() => _busy = true);
     try {
@@ -549,6 +609,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final existing = expenseId == null
           ? null
           : await repo.watchExpense(expenseId).first;
+      // The task's linked expense was deleted: create a new one rather than
+      // overwriting (and resurrecting) the one in the Cestino.
+      if (existing == null && widget.id == null) expenseId = null;
       final fromTask = taskId != null && taskId.isNotEmpty;
 
       // Payments already there keep their date and method; only the

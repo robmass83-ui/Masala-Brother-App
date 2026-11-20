@@ -7,6 +7,7 @@ import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/money_text.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/undo_snackbar.dart';
@@ -88,6 +89,7 @@ class TransfersListPage extends ConsumerWidget {
                       _TransferTile(
                         transfer: t,
                         household: household,
+                        onOpen: () => context.push('/bonifici/${t.id}'),
                         onDelete: household == null || user == null
                             ? null
                             : () => _delete(context, ref, t, user.uid),
@@ -105,8 +107,12 @@ class TransfersListPage extends ConsumerWidget {
     Transfer transfer,
     String uid,
   ) async {
-    await ref.read(transferRepositoryProvider).softDelete(transfer.id, uid);
-    if (!context.mounted) return;
+    final ok = await guardedAction(
+      context,
+      () => ref.read(transferRepositoryProvider).softDelete(transfer.id, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!ok || !context.mounted) return;
     showUndoSnackBar(
       context,
       message: 'Bonifico eliminato',
@@ -121,11 +127,13 @@ class _TransferTile extends StatelessWidget {
   const _TransferTile({
     required this.transfer,
     required this.household,
+    required this.onOpen,
     required this.onDelete,
   });
 
   final Transfer transfer;
   final Household? household;
+  final VoidCallback onOpen;
   final VoidCallback? onDelete;
 
   @override
@@ -181,6 +189,7 @@ class _TransferTile extends StatelessWidget {
           return false;
         },
         child: AppCard(
+          onTap: onOpen,
           child: Row(
             children: [
               SizedBox(

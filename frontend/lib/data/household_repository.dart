@@ -9,6 +9,7 @@ import '../features/auth/auth_models.dart';
 import 'expense_models.dart';
 import 'person_uid.dart';
 import 'seed_data.dart';
+import 'local_first.dart';
 
 class HouseholdRepository {
   HouseholdRepository({FirebaseFirestore? firestore}) : _db = firestore {
@@ -65,9 +66,9 @@ class HouseholdRepository {
       throw StateError('Email non autorizzata: ${user.email}');
     }
     if (household.members.containsKey(user.uid)) {
-      await ensureSeedData();
+      await _maintenance(() => ensureSeedData());
       final current = (await fetchHousehold())!;
-      await remapPlaceholderUids(current);
+      await _maintenance(() => remapPlaceholderUids(current, actorUid: user.uid));
       return current;
     }
 
@@ -83,15 +84,25 @@ class HouseholdRepository {
       'members.${user.uid}': member.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
-    await ensureSeedData();
+    await _maintenance(() => ensureSeedData());
     final updated = (await fetchHousehold())!;
-    await remapPlaceholderUids(updated);
+    await _maintenance(() => remapPlaceholderUids(updated, actorUid: user.uid));
     return updated;
+  }
+
+  /// Housekeeping run at login. A failure here (offline, a document the
+  /// rules don't let this user touch) must never block the login itself.
+  Future<void> _maintenance(Future<Object?> Function() step) async {
+    try {
+      await step();
+    } catch (e, st) {
+      debugPrint('Login maintenance skipped: $e\n$st');
+    }
   }
 
   /// After Laura (or Roberto) joins, rewrite import placeholders `lau` / `rob`
   /// on expenses, transfers and tasks to the live Firebase uids.
-  Future<int> remapPlaceholderUids(Household household) async {
+  Future<int> remapPlaceholderUids(Household household, {String? actorUid}) async {
     if (!_available) return 0;
     final replacements = <String, String>{
       if (household.robUid != PersonUid.rob) PersonUid.rob: household.robUid,
@@ -110,11 +121,15 @@ class HouseholdRepository {
       _householdRef.collection('tasks'),
       const ['assigneeUid', 'doneBy', 'listOwnerUid'],
       replacements,
+      ownerField: 'listOwnerUid',
+      actorUid: actorUid,
     );
     n += await _remapUidFields(
       _householdRef.collection('taskLists'),
       const ['ownerUid'],
       replacements,
+      ownerField: 'ownerUid',
+      actorUid: actorUid,
     );
     if (n > 0) {
       debugPrint('Remapped placeholder person uids on $n documents');
@@ -125,12 +140,21 @@ class HouseholdRepository {
   Future<int> _remapUidFields(
     CollectionReference<Map<String, dynamic>> col,
     List<String> fields,
-    Map<String, String> replacements,
-  ) async {
+    Map<String, String> replacements, {
+    String? ownerField,
+    String? actorUid,
+  }) async {
     final snap = await col.get();
     final writes = <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
     for (final doc in snap.docs) {
       final data = doc.data();
+      if (ownerField != null && actorUid != null) {
+        // Someone else's private item: only its owner may rewrite it (the
+        // rules reject it, and one rejection fails the whole batch).
+        final raw = data[ownerField];
+        final owner = raw is String ? (replacements[raw] ?? raw) : null;
+        if (owner != null && owner != actorUid) continue;
+      }
       final patch = <String, dynamic>{};
       for (final field in fields) {
         final current = data[field];
@@ -254,8 +278,9 @@ class HouseholdRepository {
       if (!snap.exists) continue;
       final data = snap.data();
       if (data == null) continue;
-      final street = (data['street'] as String?)?.trim() ?? '';
-      if (street.isNotEmpty) continue;
+      // Fill only addresses never set (old documents without the field):
+      // an address the user cleared on purpose stays cleared.
+      if (data.containsKey('street')) continue;
       final patch = <String, dynamic>{};
       if (p.street.isNotEmpty) patch['street'] = p.street;
       if (p.houseNumber.isNotEmpty &&
@@ -271,11 +296,15 @@ class HouseholdRepository {
     }
   }
 
-  Stream<List<CatalogCategory>> watchCategories() {
+  /// Active categories; with [includeArchived] also archived ones, so old
+  /// expenses still show a name (not a raw id) in Rendiconto and exports.
+  Stream<List<CatalogCategory>> watchCategories({bool includeArchived = false}) {
     if (!_available) {
       return Stream<List<CatalogCategory>>.multi((listener) {
-        listener.add(_activeCats());
-        final sub = _catCtrl.stream.listen(listener.add);
+        List<CatalogCategory> pick() =>
+            includeArchived ? _catMemory.values.toList() : _activeCats();
+        listener.add(pick());
+        final sub = _catCtrl.stream.listen((_) => listener.add(pick()));
         // Not awaited: `.first` would wait on the broadcast cancel.
         listener.onCancel = () => unawaited(sub.cancel());
       });
@@ -283,18 +312,20 @@ class HouseholdRepository {
     return _categories.snapshots().map((snap) {
       final items = snap.docs
           .map((d) => _categoryFrom(d.id, d.data()))
-          .where((c) => !c.isDeleted)
+          .where((c) => includeArchived || !c.isDeleted)
           .toList()
         ..sort((a, b) => a.order.compareTo(b.order));
       return items;
     });
   }
 
-  Stream<List<CatalogProperty>> watchProperties() {
+  Stream<List<CatalogProperty>> watchProperties({bool includeArchived = false}) {
     if (!_available) {
       return Stream<List<CatalogProperty>>.multi((listener) {
-        listener.add(_activeProps());
-        final sub = _propCtrl.stream.listen(listener.add);
+        List<CatalogProperty> pick() =>
+            includeArchived ? _propMemory.values.toList() : _activeProps();
+        listener.add(pick());
+        final sub = _propCtrl.stream.listen((_) => listener.add(pick()));
         // Not awaited: `.first` would wait on the broadcast cancel.
         listener.onCancel = () => unawaited(sub.cancel());
       });
@@ -302,7 +333,7 @@ class HouseholdRepository {
     return _properties.snapshots().map((snap) {
       final items = snap.docs
           .map((d) => _propertyFrom(d.id, d.data()))
-          .where((p) => !p.isDeleted)
+          .where((p) => includeArchived || !p.isDeleted)
           .toList()
         ..sort((a, b) => a.order.compareTo(b.order));
       return items;
@@ -333,14 +364,14 @@ class HouseholdRepository {
       return saved;
     }
 
-    await _categories.doc(id).set({
+    await localFirst(_categories.doc(id).set({
       'name': saved.name,
       'order': saved.order,
       'isDefault': saved.isDefault,
       'deletedAt': saved.deletedAt == null
           ? null
           : Timestamp.fromDate(saved.deletedAt!),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     return saved;
   }
 
@@ -377,45 +408,49 @@ class HouseholdRepository {
       return saved;
     }
 
-    await _properties.doc(id).set({
+    await localFirst(_properties.doc(id).set({
       ...saved.toMap(),
       'deletedAt': saved.deletedAt == null
           ? null
           : Timestamp.fromDate(saved.deletedAt!),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     return saved;
   }
 
   Future<void> reorderCategories(List<String> ids) async {
-    for (var i = 0; i < ids.length; i++) {
-      final current = _catMemory[ids[i]];
-      if (!_available) {
+    if (!_available) {
+      for (var i = 0; i < ids.length; i++) {
+        final current = _catMemory[ids[i]];
         if (current == null) continue;
         _catMemory[ids[i]] = current.copyWith(order: i);
-      } else {
-        await _categories.doc(ids[i]).set(
-          {'order': i},
-          SetOptions(merge: true),
-        );
       }
+      _catCtrl.add(_activeCats());
+      return;
     }
-    if (!_available) _catCtrl.add(_activeCats());
+    // One atomic batch: no half-reordered list if the app closes offline.
+    final batch = _db!.batch();
+    for (var i = 0; i < ids.length; i++) {
+      batch.set(_categories.doc(ids[i]), {'order': i}, SetOptions(merge: true));
+    }
+    await localFirst(batch.commit());
   }
 
   Future<void> reorderProperties(List<String> ids) async {
-    for (var i = 0; i < ids.length; i++) {
-      final current = _propMemory[ids[i]];
-      if (!_available) {
+    if (!_available) {
+      for (var i = 0; i < ids.length; i++) {
+        final current = _propMemory[ids[i]];
         if (current == null) continue;
         _propMemory[ids[i]] = current.copyWith(order: i);
-      } else {
-        await _properties.doc(ids[i]).set(
-          {'order': i},
-          SetOptions(merge: true),
-        );
       }
+      _propCtrl.add(_activeProps());
+      return;
     }
-    if (!_available) _propCtrl.add(_activeProps());
+    // One atomic batch: no half-reordered list if the app closes offline.
+    final batch = _db!.batch();
+    for (var i = 0; i < ids.length; i++) {
+      batch.set(_properties.doc(ids[i]), {'order': i}, SetOptions(merge: true));
+    }
+    await localFirst(batch.commit());
   }
 
   Future<void> archiveCategory(String id) async {
@@ -428,9 +463,9 @@ class HouseholdRepository {
     }
     final snap = await _categories.doc(id).get();
     if (snap.data()?['isDefault'] == true) return;
-    await _categories.doc(id).set({
+    await localFirst(_categories.doc(id).set({
       'deletedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
   }
 
   Future<void> archiveProperty(String id) async {
@@ -441,9 +476,9 @@ class HouseholdRepository {
       _propCtrl.add(_activeProps());
       return;
     }
-    await _properties.doc(id).set({
+    await localFirst(_properties.doc(id).set({
       'deletedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
   }
 
   void dispose() {

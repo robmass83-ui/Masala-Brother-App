@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/undo_snackbar.dart';
 import '../../data/data_providers.dart';
 import '../../data/trash_models.dart';
@@ -17,11 +18,17 @@ class TrashPage extends ConsumerWidget {
     final c = context.colors;
     final items = ref.watch(trashItemsProvider);
     final user = ref.watch(authSessionProvider).valueOrNull?.user;
+    final loading = ref.watch(deletedExpensesProvider).isLoading ||
+        ref.watch(deletedTransfersProvider).isLoading ||
+        ref.watch(deletedTasksProvider).isLoading ||
+        ref.watch(deletedTaskListsProvider).isLoading;
 
     return Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(title: const Text('Cestino')),
-      body: items.isEmpty
+      body: items.isEmpty && loading
+          ? const Center(child: CircularProgressIndicator())
+          : items.isEmpty
           ? ListView(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
               children: const [
@@ -111,17 +118,20 @@ class TrashPage extends ConsumerWidget {
     TrashItem item,
     String uid,
   ) async {
-    switch (item.kind) {
-      case TrashKind.expense:
-        await ref.read(expenseRepositoryProvider).restore(item.id, uid);
-      case TrashKind.transfer:
-        await ref.read(transferRepositoryProvider).restore(item.id, uid);
-      case TrashKind.task:
-        await ref.read(taskRepositoryProvider).restore(item.id, uid);
-      case TrashKind.taskList:
-        await ref.read(taskRepositoryProvider).restoreLists([item.id], uid);
-    }
-    if (!context.mounted) return;
+    final ok = await guardedAction(
+      context,
+      () => switch (item.kind) {
+        TrashKind.expense =>
+          ref.read(expenseRepositoryProvider).restore(item.id, uid),
+        TrashKind.transfer =>
+          ref.read(transferRepositoryProvider).restore(item.id, uid),
+        TrashKind.task => ref.read(taskRepositoryProvider).restore(item.id, uid),
+        TrashKind.taskList =>
+          ref.read(taskRepositoryProvider).restoreLists([item.id], uid),
+      },
+      failure: 'Ripristino non riuscito. Riprova.',
+    );
+    if (!ok || !context.mounted) return;
     showUndoSnackBar(
       context,
       message: 'Ripristinata',

@@ -6,7 +6,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/data_providers.dart';
-import '../../data/expense_models.dart';
 import '../../data/report_aggregator.dart';
 import '../auth/auth_providers.dart';
 import '../report/period_selector.dart';
@@ -34,6 +33,9 @@ class _ExportPageState extends ConsumerState<ExportPage> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final period = ref.watch(reportPeriodProvider);
+    // Keep the name maps loaded so an export uses real names right away.
+    ref.watch(categoryNamesProvider);
+    ref.watch(propertyNamesProvider);
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -184,16 +186,8 @@ class _ExportPageState extends ConsumerState<ExportPage> {
       final transfers =
           ref.read(transfersProvider).valueOrNull ?? const [];
       final tasks = ref.read(visibleTasksProvider);
-      final cats = {
-        for (final x in ref.read(categoriesProvider).valueOrNull ??
-            const <CatalogCategory>[])
-          x.id: x.name,
-      };
-      final props = {
-        for (final x in ref.read(propertiesProvider).valueOrNull ??
-            const <CatalogProperty>[])
-          x.id: x.name,
-      };
+      final cats = ref.read(categoryNamesProvider);
+      final props = ref.read(propertyNamesProvider);
       final snapshot = const ReportAggregator().build(
         expenses: expenses,
         transfers: transfers,

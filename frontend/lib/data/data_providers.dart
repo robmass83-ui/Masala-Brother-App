@@ -106,6 +106,35 @@ final propertiesProvider = StreamProvider<List<CatalogProperty>>((ref) {
   return ref.watch(householdRepositoryProvider).watchProperties();
 });
 
+final _allCategoriesProvider = StreamProvider<List<CatalogCategory>>((ref) {
+  return ref
+      .watch(householdRepositoryProvider)
+      .watchCategories(includeArchived: true);
+});
+
+final _allPropertiesProvider = StreamProvider<List<CatalogProperty>>((ref) {
+  return ref
+      .watch(householdRepositoryProvider)
+      .watchProperties(includeArchived: true);
+});
+
+/// id → name for every category, archived ones included: an old expense
+/// filed under an archived category still shows its name, not a raw id.
+final categoryNamesProvider = Provider<Map<String, String>>((ref) {
+  final all = ref.watch(_allCategoriesProvider).valueOrNull ??
+      ref.watch(categoriesProvider).valueOrNull ??
+      const <CatalogCategory>[];
+  return {for (final x in all) x.id: x.name};
+});
+
+/// Same as [categoryNamesProvider], for properties.
+final propertyNamesProvider = Provider<Map<String, String>>((ref) {
+  final all = ref.watch(_allPropertiesProvider).valueOrNull ??
+      ref.watch(propertiesProvider).valueOrNull ??
+      const <CatalogProperty>[];
+  return {for (final x in all) x.id: x.name};
+});
+
 final expenseListFilterProvider =
     StateProvider<ExpenseListFilter>((ref) => const ExpenseListFilter());
 
@@ -117,16 +146,8 @@ final reportSnapshotProvider = Provider<ReportSnapshot>((ref) {
   final expenses = ref.watch(expensesProvider).valueOrNull ?? const [];
   final transfers = ref.watch(transfersProvider).valueOrNull ?? const [];
   final tasks = ref.watch(visibleTasksProvider);
-  final cats = {
-    for (final x
-        in ref.watch(categoriesProvider).valueOrNull ?? const <CatalogCategory>[])
-      x.id: x.name,
-  };
-  final props = {
-    for (final x
-        in ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[])
-      x.id: x.name,
-  };
+  final cats = ref.watch(categoryNamesProvider);
+  final props = ref.watch(propertyNamesProvider);
   return const ReportAggregator().build(
     expenses: expenses,
     transfers: transfers,
@@ -151,6 +172,18 @@ final balanceProvider = Provider<BalanceSnapshot>((ref) {
   );
 });
 
+/// Whether the balance can be trusted yet: while expenses or transfers are
+/// still loading (or failed) the balance would wrongly read "in pari".
+enum BalanceReadiness { loading, ready, failed }
+
+final balanceReadinessProvider = Provider<BalanceReadiness>((ref) {
+  final expenses = ref.watch(expensesProvider);
+  final transfers = ref.watch(transfersProvider);
+  if (expenses.hasError || transfers.hasError) return BalanceReadiness.failed;
+  if (!expenses.hasValue || !transfers.hasValue) return BalanceReadiness.loading;
+  return BalanceReadiness.ready;
+});
+
 final activityProvider = StreamProvider<List<ActivityEntry>>((ref) {
   return ref.watch(activityRepositoryProvider).watchActivity();
 });
@@ -171,7 +204,38 @@ final deletedTaskListsProvider = StreamProvider<List<TaskList>>((ref) {
   return ref.watch(taskRepositoryProvider).watchDeletedLists();
 });
 
+/// Ids of the other person's "solo mia" tasks and lists (live or trashed):
+/// they must not surface in the Cestino or in Attività.
+final hiddenPrivateIdsProvider = Provider<Set<String>>((ref) {
+  final uid = ref.watch(authSessionProvider).valueOrNull?.user?.uid;
+  final tasks = [
+    ...ref.watch(tasksProvider).valueOrNull ?? const <HouseholdTask>[],
+    ...ref.watch(deletedTasksProvider).valueOrNull ?? const <HouseholdTask>[],
+  ];
+  final lists = [
+    ...ref.watch(taskListsProvider).valueOrNull ?? const <TaskList>[],
+    ...ref.watch(deletedTaskListsProvider).valueOrNull ?? const <TaskList>[],
+  ];
+  return {
+    for (final t in tasks)
+      if (!t.isVisibleTo(uid)) t.id,
+    for (final l in lists)
+      if (!l.isVisibleTo(uid)) l.id,
+  };
+});
+
+final visibleActivityProvider = Provider<AsyncValue<List<ActivityEntry>>>((ref) {
+  final hidden = ref.watch(hiddenPrivateIdsProvider);
+  return ref.watch(activityProvider).whenData(
+        (items) => [
+          for (final e in items)
+            if (!hidden.contains(e.refId)) e,
+        ],
+      );
+});
+
 final trashItemsProvider = Provider<List<TrashItem>>((ref) {
+  final uid = ref.watch(authSessionProvider).valueOrNull?.user?.uid;
   final expenses =
       ref.watch(deletedExpensesProvider).valueOrNull ?? const <Expense>[];
   final transfers =
@@ -199,7 +263,7 @@ final trashItemsProvider = Provider<List<TrashItem>>((ref) {
           deletedAt: t.deletedAt!,
         ),
     for (final t in tasks)
-      if (t.deletedAt != null)
+      if (t.deletedAt != null && t.isVisibleTo(uid))
         TrashItem(
           kind: TrashKind.task,
           id: t.id,
@@ -207,7 +271,7 @@ final trashItemsProvider = Provider<List<TrashItem>>((ref) {
           deletedAt: t.deletedAt!,
         ),
     for (final l in lists)
-      if (l.deletedAt != null)
+      if (l.deletedAt != null && l.isVisibleTo(uid))
         TrashItem(
           kind: TrashKind.taskList,
           id: l.id,

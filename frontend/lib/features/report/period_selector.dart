@@ -84,11 +84,19 @@ class PeriodSelector extends StatelessWidget {
     final now = DateTime.now();
     final from = period.from ?? DateTime(now.year, 1, 1);
     final to = period.to ?? now;
-    onChanged(ReportPeriod.custom(from, to));
-    await _pickBound(context, isFrom: true);
+    final custom = ReportPeriod.custom(from, to);
+    onChanged(custom);
+    // This widget still holds the old period until it rebuilds: pass the
+    // new one, or picking "Da" from "Tutto" collapsed it to a single day.
+    await _pickBound(context, isFrom: true, base: custom);
   }
 
-  Future<void> _pickBound(BuildContext context, {required bool isFrom}) async {
+  Future<void> _pickBound(
+    BuildContext context, {
+    required bool isFrom,
+    ReportPeriod? base,
+  }) async {
+    final period = base ?? this.period;
     final now = DateTime.now();
     final current = isFrom
         ? (period.from ?? DateTime(now.year, 1, 1))
@@ -101,8 +109,14 @@ class PeriodSelector extends StatelessWidget {
       locale: const Locale('it', 'IT'),
     );
     if (picked == null) return;
-    final from = isFrom ? picked : (period.from ?? picked);
-    final to = isFrom ? (period.to ?? picked) : picked;
+    var from = isFrom ? picked : (period.from ?? picked);
+    var to = isFrom ? (period.to ?? now) : picked;
+    // "Da" after "A": swap rather than produce an empty period.
+    if (from.isAfter(to)) {
+      final t = from;
+      from = to;
+      to = t;
+    }
     onChanged(ReportPeriod.custom(from, to));
   }
 }

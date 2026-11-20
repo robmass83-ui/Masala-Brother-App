@@ -8,6 +8,7 @@ import 'activity_models.dart';
 import 'activity_repository.dart';
 import 'expense_models.dart';
 import 'trash_models.dart';
+import 'local_first.dart';
 
 class ExpenseRepository {
   ExpenseRepository({
@@ -126,7 +127,7 @@ class ExpenseRepository {
       return withId;
     }
 
-    await _col.doc(id).set(withId.toMap(isCreate: isCreate), SetOptions(merge: true));
+    await localFirst(_col.doc(id).set(withId.toMap(isCreate: isCreate), SetOptions(merge: true)));
     await _log(
       isCreate ? ActivityType.expenseCreated : ActivityType.expenseUpdated,
       id,
@@ -153,11 +154,11 @@ class ExpenseRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': FieldValue.serverTimestamp(),
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.expenseDeleted,
       id,
@@ -181,11 +182,11 @@ class ExpenseRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': null,
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.expenseRestored,
       id,
@@ -200,9 +201,10 @@ class ExpenseRepository {
     required String actorUid,
     required String robUid,
     required String lauUid,
-  }) {
+  }) async {
+    final current = await _latest(expense);
     return save(
-      draft: expense.copyWith(payments: [...expense.payments, payment]),
+      draft: current.copyWith(payments: [...current.payments, payment]),
       actorUid: actorUid,
       robUid: robUid,
       lauUid: lauUid,
@@ -216,21 +218,20 @@ class ExpenseRepository {
     required String robUid,
     required String lauUid,
   }) async {
-    var current = expense;
-    for (final part in parts) {
-      if (part.amountCents <= 0) continue;
-      current = await addPayment(
-        expense: current,
-        payment: newPayment(
-          payerUid: part.payerUid,
-          amountCents: part.amountCents,
-        ),
-        actorUid: actorUid,
-        robUid: robUid,
-        lauUid: lauUid,
-      );
-    }
-    return current;
+    // One write for all parts: a split payment is never half-saved.
+    final added = [
+      for (final part in parts)
+        if (part.amountCents > 0)
+          newPayment(payerUid: part.payerUid, amountCents: part.amountCents),
+    ];
+    if (added.isEmpty) return expense;
+    final current = await _latest(expense);
+    return save(
+      draft: current.copyWith(payments: [...current.payments, ...added]),
+      actorUid: actorUid,
+      robUid: robUid,
+      lauUid: lauUid,
+    );
   }
 
   Future<Expense> removePayment({
@@ -239,10 +240,11 @@ class ExpenseRepository {
     required String actorUid,
     required String robUid,
     required String lauUid,
-  }) {
+  }) async {
+    final current = await _latest(expense);
     return save(
-      draft: expense.copyWith(
-        payments: expense.payments.where((p) => p.id != paymentId).toList(),
+      draft: current.copyWith(
+        payments: current.payments.where((p) => p.id != paymentId).toList(),
       ),
       actorUid: actorUid,
       robUid: robUid,
@@ -260,9 +262,10 @@ class ExpenseRepository {
     required String actorUid,
     required String robUid,
     required String lauUid,
-  }) {
+  }) async {
+    final current = await _latest(expense);
     final payments = <ExpensePayment>[];
-    for (final p in expense.payments) {
+    for (final p in current.payments) {
       if (p.id != paymentId) {
         payments.add(p);
         continue;
@@ -285,7 +288,7 @@ class ExpenseRepository {
       }
     }
     return save(
-      draft: expense.copyWith(payments: payments),
+      draft: current.copyWith(payments: payments),
       actorUid: actorUid,
       robUid: robUid,
       lauUid: lauUid,
@@ -319,6 +322,18 @@ class ExpenseRepository {
       out.add(newPayment(payerUid: entry.key, amountCents: entry.value));
     }
     return out;
+  }
+
+  /// The newest stored version of [expense], so a payment change made from
+  /// a screen opened a while ago doesn't overwrite the other person's edits.
+  /// Throws if the expense was deleted meanwhile (never resurrect it).
+  Future<Expense> _latest(Expense expense) async {
+    if (expense.id.isEmpty) return expense;
+    final fresh = await watchExpense(expense.id).first;
+    if (fresh == null) {
+      throw StateError('La spesa è stata eliminata.');
+    }
+    return fresh;
   }
 
   Future<List<Expense>> fetchAll() async {
@@ -423,7 +438,10 @@ class ExpenseRepository {
   Future<String> _titleOf(String id) async {
     if (!_live) return _memory[id]?.description ?? 'spesa';
     try {
-      final snap = await _col.doc(id).get();
+      final snap = await _col
+          .doc(id)
+          .get(const GetOptions(source: Source.cache))
+          .catchError((Object _) => _col.doc(id).get());
       final d = snap.data()?['description'] as String?;
       return (d == null || d.trim().isEmpty) ? 'spesa' : d;
     } catch (_) {

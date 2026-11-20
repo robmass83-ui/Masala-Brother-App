@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../data/data_providers.dart';
 
 import '../../data/task_models.dart';
 import '../auth/auth_models.dart';
@@ -36,7 +39,7 @@ Future<void> pushExpenseForTask(
   required bool fromCompletion,
   Household? household,
   String? actorUid,
-}) {
+}) async {
   final extra = ExpenseFormPrefill(
     description: task.title,
     propertyId: task.propertyId,
@@ -52,7 +55,17 @@ Future<void> pushExpenseForTask(
   );
   final linked = resolveLinkedExpenseId(taskLinkedExpenseId: task.linkedExpenseId);
   if (linked != null) {
-    return context.push('/spese/$linked/modifica', extra: extra);
+    // The linked expense may have been deleted meanwhile: then start a new
+    // one (the form re-links the task) instead of an empty "Modifica".
+    final repo = ProviderScope.containerOf(context, listen: false)
+        .read(expenseRepositoryProvider);
+    final exists = await repo.watchExpense(linked).first != null;
+    if (!context.mounted) return;
+    if (exists) {
+      await context.push('/spese/$linked/modifica', extra: extra);
+      return;
+    }
   }
-  return context.push('/spese/nuova', extra: extra);
+  if (!context.mounted) return;
+  await context.push('/spese/nuova', extra: extra);
 }

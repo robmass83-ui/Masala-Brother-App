@@ -23,13 +23,14 @@ Future<void> checkAppUpdates(BuildContext context) async {
   } catch (e) {
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
-    _snack(context, e.toString());
+    _snack(context, e);
     return;
   }
   if (!context.mounted) return;
   Navigator.of(context, rootNavigator: true).pop();
 
-  if (latest == null || !AppUpdater.isNewer(latest.version, AppConfig.appVersion)) {
+  if (latest == null ||
+      !AppUpdater.isNewer(latest.version, AppConfig.appVersion)) {
     _snack(context, 'Hai già l’ultima versione (${AppConfig.appVersion}).');
     return;
   }
@@ -57,7 +58,11 @@ Future<bool> offerAvailableUpdate(
         content: Text(
           'Ora hai la ${AppConfig.appVersion}. Vuoi scaricare e installare l’aggiornamento? '
           'Android ti chiederà conferma.',
-          style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600, height: 1.4),
+          style: TextStyle(
+            color: c.ink2,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
@@ -89,34 +94,40 @@ Future<void> _downloadAndInstall(
     barrierDismissible: false,
     builder: (ctx) {
       final c = ctx.colors;
-      return AlertDialog(
-        backgroundColor: c.card,
-        title: Text(
-          'Download ${latest.version}',
-          style: TextStyle(color: c.ink, fontWeight: FontWeight.w800),
-        ),
-        content: ValueListenableBuilder<double?>(
-          valueListenable: progress,
-          builder: (context, value, _) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LinearProgressIndicator(
-                  value: value,
-                  color: c.acc,
-                  backgroundColor: c.accSoft,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  value == null
-                      ? 'Preparazione…'
-                      : '${(value * 100).clamp(0, 100).toStringAsFixed(0)}%',
-                  style: TextStyle(color: c.ink2, fontWeight: FontWeight.w600),
-                ),
-              ],
-            );
-          },
+      return PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: c.card,
+          title: Text(
+            'Download ${latest.version}',
+            style: TextStyle(color: c.ink, fontWeight: FontWeight.w800),
+          ),
+          content: ValueListenableBuilder<double?>(
+            valueListenable: progress,
+            builder: (context, value, _) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(
+                    value: value,
+                    color: c.acc,
+                    backgroundColor: c.accSoft,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    value == null
+                        ? 'Preparazione…'
+                        : '${(value * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: c.ink2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       );
     },
@@ -139,7 +150,7 @@ Future<void> _downloadAndInstall(
   } catch (e) {
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
-    _snack(context, e.toString());
+    _snack(context, e);
   } finally {
     progress.dispose();
   }
@@ -150,24 +161,33 @@ void _showBusy(BuildContext context, String message) {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: c.card,
-      content: Row(
-        children: [
-          CircularProgressIndicator(color: c.acc),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        backgroundColor: c.card,
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: c.acc),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
 }
 
-void _snack(BuildContext context, String message) {
+void _snack(BuildContext context, Object messageOrError) {
+  // Our own messages and errors are in Italian; network/system ones are not.
+  final message = switch (messageOrError) {
+    String s => s,
+    AppUpdateException e => e.message,
+    _ => 'Connessione non riuscita. Controlla di essere online e riprova.',
+  };
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

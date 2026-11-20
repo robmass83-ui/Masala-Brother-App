@@ -8,6 +8,7 @@ import 'activity_models.dart';
 import 'activity_repository.dart';
 import 'task_models.dart';
 import 'trash_models.dart';
+import 'local_first.dart';
 
 class TaskRepository {
   TaskRepository({
@@ -133,10 +134,10 @@ class TaskRepository {
       return withId;
     }
 
-    await _col.doc(id).set(
+    await localFirst(_col.doc(id).set(
           withId.toMap(isCreate: isCreate),
           SetOptions(merge: true),
-        );
+        ));
     if (logActivity) {
       await _log(
         isCreate ? ActivityType.taskCreated : ActivityType.taskUpdated,
@@ -190,11 +191,11 @@ class TaskRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': FieldValue.serverTimestamp(),
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.taskDeleted,
       id,
@@ -218,11 +219,11 @@ class TaskRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': null,
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.taskRestored,
       id,
@@ -234,7 +235,10 @@ class TaskRepository {
   Future<String> _titleOf(String id) async {
     if (!_live) return _memory[id]?.title ?? 'cosa da fare';
     try {
-      final snap = await _col.doc(id).get();
+      final snap = await _col
+          .doc(id)
+          .get(const GetOptions(source: Source.cache))
+          .catchError((Object _) => _col.doc(id).get());
       final t = snap.data()?['title'] as String?;
       return (t == null || t.trim().isEmpty) ? 'cosa da fare' : t;
     } catch (_) {
@@ -303,10 +307,10 @@ class TaskRepository {
       return withId;
     }
 
-    await _listCol.doc(id).set(
+    await localFirst(_listCol.doc(id).set(
           withId.toMap(isCreate: isCreate),
           SetOptions(merge: true),
-        );
+        ));
     return withId;
   }
 
@@ -339,7 +343,7 @@ class TaskRepository {
         SetOptions(merge: true),
       );
     }
-    await batch.commit();
+    await localFirst(batch.commit());
   }
 
   Future<void> restoreLists(Iterable<String> ids, String actorUid) async {
@@ -371,7 +375,7 @@ class TaskRepository {
         SetOptions(merge: true),
       );
     }
-    await batch.commit();
+    await localFirst(batch.commit());
   }
 
   Future<List<HouseholdTask>> fetchAll() async {

@@ -46,11 +46,17 @@ class ExcelImporter {
         actorUid,
       );
       wiped += await tasks.retireMany(
-        existingTasks.where((t) => !t.isDeleted).map((t) => t.id),
+        // Never touch the other person's private items: not ours to
+        // trash, and the rules reject it (the whole import would fail).
+        existingTasks
+            .where((t) => !t.isDeleted && t.isVisibleTo(actorUid))
+            .map((t) => t.id),
         actorUid,
       );
       wiped += await tasks.retireLists(
-        existingLists.where((l) => !l.isDeleted).map((l) => l.id),
+        existingLists
+            .where((l) => !l.isDeleted && l.isVisibleTo(actorUid))
+            .map((l) => l.id),
         actorUid,
       );
     }

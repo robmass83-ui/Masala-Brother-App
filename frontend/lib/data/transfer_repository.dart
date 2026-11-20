@@ -8,6 +8,7 @@ import 'activity_models.dart';
 import 'activity_repository.dart';
 import 'transfer_models.dart';
 import 'trash_models.dart';
+import 'local_first.dart';
 
 class TransferRepository {
   TransferRepository({
@@ -105,10 +106,10 @@ class TransferRepository {
       return withId;
     }
 
-    await _col.doc(id).set(
+    await localFirst(_col.doc(id).set(
           withId.toMap(isCreate: isCreate),
           SetOptions(merge: true),
-        );
+        ));
     if (isCreate) {
       await _log(
         ActivityType.transferCreated,
@@ -134,11 +135,11 @@ class TransferRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': FieldValue.serverTimestamp(),
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.transferDeleted,
       id,
@@ -228,11 +229,11 @@ class TransferRepository {
       );
       return;
     }
-    await _col.doc(id).set({
+    await localFirst(_col.doc(id).set({
       'deletedAt': null,
       'updatedBy': actorUid,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    }, SetOptions(merge: true)));
     await _log(
       ActivityType.transferRestored,
       id,

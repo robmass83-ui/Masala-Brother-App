@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/person_avatar.dart';
@@ -220,6 +221,10 @@ class _TasksPageState extends ConsumerState<TasksPage> {
                 actionLabel: 'Nuova lista',
                 onAction: () => showCreateTaskListDialog(context, ref),
               )
+            else if (sections.isEmpty)
+              const EmptyState(
+                message: 'Nessuna cosa fatta, per ora. Quelle che segni fatte compaiono qui.',
+              )
             else
               for (var i = 0; i < sections.length; i++) ...[
                 if (i > 0) const SizedBox(height: 14),
@@ -288,8 +293,12 @@ class _TasksPageState extends ConsumerState<TasksPage> {
   ) async {
     final repo = ref.read(taskRepositoryProvider);
     final markingDone = !task.done;
-    await repo.setDone(task: task, done: markingDone, actorUid: user.uid);
-    if (!mounted) return;
+    final ok = await guardedAction(
+      context,
+      () => repo.setDone(task: task, done: markingDone, actorUid: user.uid),
+      failure: 'Non riuscito. Riprova.',
+    );
+    if (!ok || !mounted) return;
 
     if (markingDone && task.createExpenseOnDone) {
       await pushExpenseForTask(
@@ -303,8 +312,12 @@ class _TasksPageState extends ConsumerState<TasksPage> {
   }
 
   Future<void> _delete(HouseholdTask task, String uid) async {
-    await ref.read(taskRepositoryProvider).softDelete(task.id, uid);
-    if (!mounted) return;
+    final ok = await guardedAction(
+      context,
+      () => ref.read(taskRepositoryProvider).softDelete(task.id, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!ok || !mounted) return;
     showUndoSnackBar(
       context,
       message: 'Cosa da fare eliminata',
@@ -359,8 +372,12 @@ class _TasksPageState extends ConsumerState<TasksPage> {
     if (ok != true || !mounted) return;
 
     final ids = chosen.map((l) => l.id).toList();
-    await ref.read(taskRepositoryProvider).softDeleteLists(ids, uid);
-    if (!mounted) return;
+    final deleted = await guardedAction(
+      context,
+      () => ref.read(taskRepositoryProvider).softDeleteLists(ids, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!deleted || !mounted) return;
     _exitManage();
   }
 }

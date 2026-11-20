@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/money_text.dart';
 import '../../core/widgets/person_avatar.dart';
@@ -13,6 +14,7 @@ import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/status_mapping.dart';
 import '../../core/widgets/undo_snackbar.dart';
 import '../../data/data_providers.dart';
+import '../../router/navigator_keys.dart';
 import '../../data/expense_models.dart';
 import '../auth/auth_models.dart';
 import '../auth/auth_providers.dart';
@@ -94,7 +96,7 @@ class ExpenseDetailPage extends ConsumerWidget {
                 children: [
                   StatusChip(status: statusToUi(expense.status)),
                   const SizedBox(width: 8),
-                  _SoftChip(label: cat),
+                  Flexible(child: _SoftChip(label: cat)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -187,19 +189,27 @@ class ExpenseDetailPage extends ConsumerWidget {
                         );
                         if (!ok) return false;
                         final repo = ref.read(expenseRepositoryProvider);
-                        await repo.removePayment(
-                          expense: expense,
-                          paymentId: p.id,
-                          actorUid: user.uid,
-                          robUid: household.robUid,
-                          lauUid: household.lauUid,
+                        if (!context.mounted) return false;
+                        final removed = await guardedAction(
+                          context,
+                          () => repo.removePayment(
+                            expense: expense,
+                            paymentId: p.id,
+                            actorUid: user.uid,
+                            robUid: household.robUid,
+                            lauUid: household.lauUid,
+                          ),
+                          failure: 'Pagamento non eliminato. Riprova.',
                         );
-                        if (context.mounted) {
+                        if (removed && context.mounted) {
                           showUndoSnackBar(
                             context,
                             message: 'Pagamento eliminato',
-                            onUndo: () => repo.save(
-                              draft: expense,
+                            // Put back just this payment, on the current
+                            // version: other changes made meanwhile stay.
+                            onUndo: () => repo.addPayment(
+                              expense: expense,
+                              payment: p,
                               actorUid: user.uid,
                               robUid: household.robUid,
                               lauUid: household.lauUid,
@@ -287,17 +297,21 @@ class ExpenseDetailPage extends ConsumerWidget {
           expense.missingCents > 0 ? expense.missingCents : expense.amountDueCents,
       title: 'Pagamento',
     );
-    if (draft == null) return;
+    if (draft == null || !context.mounted) return;
     final repo = ref.read(expenseRepositoryProvider);
-    await repo.addPayments(
-      expense: expense,
-      parts: [
-        for (final p in draft.parts)
-          (payerUid: p.payerUid, amountCents: p.amountCents),
-      ],
-      actorUid: user.uid,
-      robUid: household.robUid,
-      lauUid: household.lauUid,
+    await guardedAction(
+      context,
+      () => repo.addPayments(
+        expense: expense,
+        parts: [
+          for (final p in draft.parts)
+            (payerUid: p.payerUid, amountCents: p.amountCents),
+        ],
+        actorUid: user.uid,
+        robUid: household.robUid,
+        lauUid: household.lauUid,
+      ),
+      failure: 'Pagamento non salvato. Riprova.',
     );
   }
 
@@ -318,18 +332,23 @@ class ExpenseDetailPage extends ConsumerWidget {
       initialRobCents: isLau ? 0 : payment.amountCents,
       initialLauCents: isLau ? payment.amountCents : 0,
     );
-    if (draft == null) return;
-    await ref.read(expenseRepositoryProvider).replacePayment(
-          expense: expense,
-          paymentId: payment.id,
-          parts: [
-            for (final p in draft.parts)
-              (payerUid: p.payerUid, amountCents: p.amountCents),
-          ],
-          actorUid: user.uid,
-          robUid: household.robUid,
-          lauUid: household.lauUid,
-        );
+    if (draft == null || !context.mounted) return;
+    final repo = ref.read(expenseRepositoryProvider);
+    await guardedAction(
+      context,
+      () => repo.replacePayment(
+        expense: expense,
+        paymentId: payment.id,
+        parts: [
+          for (final p in draft.parts)
+            (payerUid: p.payerUid, amountCents: p.amountCents),
+        ],
+        actorUid: user.uid,
+        robUid: household.robUid,
+        lauUid: household.lauUid,
+      ),
+      failure: 'Pagamento non salvato. Riprova.',
+    );
   }
 
   Future<void> _markPaid(
@@ -346,17 +365,21 @@ class ExpenseDetailPage extends ConsumerWidget {
           expense.missingCents > 0 ? expense.missingCents : expense.amountDueCents,
       title: 'Segna pagata',
     );
-    if (draft == null) return;
+    if (draft == null || !context.mounted) return;
     final repo = ref.read(expenseRepositoryProvider);
-    await repo.addPayments(
-      expense: expense,
-      parts: [
-        for (final p in draft.parts)
-          (payerUid: p.payerUid, amountCents: p.amountCents),
-      ],
-      actorUid: user.uid,
-      robUid: household.robUid,
-      lauUid: household.lauUid,
+    await guardedAction(
+      context,
+      () => repo.addPayments(
+        expense: expense,
+        parts: [
+          for (final p in draft.parts)
+            (payerUid: p.payerUid, amountCents: p.amountCents),
+        ],
+        actorUid: user.uid,
+        robUid: household.robUid,
+        lauUid: household.lauUid,
+      ),
+      failure: 'Pagamento non salvato. Riprova.',
     );
   }
 
@@ -368,21 +391,28 @@ class ExpenseDetailPage extends ConsumerWidget {
     Household household,
   ) async {
     final repo = ref.read(expenseRepositoryProvider);
-    final saved = await repo.save(
-      draft: Expense(
-        id: '',
-        description: expense.description,
-        amountDueCents: expense.amountDueCents,
-        date: DateTime.now(),
-        categoryId: expense.categoryId,
-        propertyId: expense.propertyId,
-        shareRobPct: expense.shareRobPct,
+    Expense? saved;
+    final ok = await guardedAction(
+      context,
+      () async => saved = await repo.save(
+        draft: Expense(
+          id: '',
+          description: expense.description,
+          amountDueCents: expense.amountDueCents,
+          date: DateTime.now(),
+          categoryId: expense.categoryId,
+          propertyId: expense.propertyId,
+          shareRobPct: expense.shareRobPct,
+        ),
+        actorUid: user.uid,
+        robUid: household.robUid,
+        lauUid: household.lauUid,
       ),
-      actorUid: user.uid,
-      robUid: household.robUid,
-      lauUid: household.lauUid,
+      failure: 'Duplicazione non riuscita. Riprova.',
     );
-    if (context.mounted) context.push('/spese/${saved.id}');
+    if (ok && saved != null && context.mounted) {
+      context.push('/spese/${saved!.id}');
+    }
   }
 
   Future<void> _delete(
@@ -398,14 +428,28 @@ class ExpenseDetailPage extends ConsumerWidget {
     );
     if (!ok) return;
     final repo = ref.read(expenseRepositoryProvider);
-    await repo.softDelete(expense.id, uid);
     if (!context.mounted) return;
-    showUndoSnackBar(
+    final deleted = await guardedAction(
       context,
+      () => repo.softDelete(expense.id, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!deleted || !context.mounted) return;
+    // Back to wherever the detail was opened from (Spese, Home, Rendiconto).
+    // Navigating clears snackbars, so "Annulla" is shown after it.
+    final rootContext = rootNavigatorKey.currentContext;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/spese');
+    }
+    final target = rootContext ?? context;
+    if (!target.mounted) return;
+    showUndoSnackBar(
+      target,
       message: 'Spesa eliminata',
       onUndo: () => repo.restore(expense.id, uid),
     );
-    context.go('/spese');
   }
 }
 
@@ -452,6 +496,8 @@ class _SoftChip extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(color: c.acc, fontWeight: FontWeight.w700, fontSize: 13),
       ),
     );

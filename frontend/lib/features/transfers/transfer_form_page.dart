@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
+import '../../core/widgets/discard_guard.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/balance_calculator.dart';
@@ -14,7 +16,10 @@ import '../../data/transfer_models.dart';
 import '../auth/auth_providers.dart';
 
 class TransferFormPage extends ConsumerStatefulWidget {
-  const TransferFormPage({super.key});
+  const TransferFormPage({super.key, this.id});
+
+  /// Set when editing an existing transfer.
+  final String? id;
 
   @override
   ConsumerState<TransferFormPage> createState() => _TransferFormPageState();
@@ -28,6 +33,9 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
   bool _defaultsApplied = false;
   bool _dirty = false;
   bool _busy = false;
+  Transfer? _existing;
+
+  bool get _isEdit => widget.id != null;
 
   @override
   void dispose() {
@@ -65,6 +73,45 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
     final snap = ref.watch(balanceProvider);
     final expensesAsync = ref.watch(expensesProvider);
     final transfersAsync = ref.watch(transfersProvider);
+    if (_isEdit && _existing == null) {
+      final list = transfersAsync.valueOrNull;
+      final found = list?.where((t) => t.id == widget.id).firstOrNull;
+      if (found == null) {
+        final missing = transfersAsync.hasValue || transfersAsync.hasError;
+        return Scaffold(
+          backgroundColor: c.bg,
+          appBar: AppBar(
+            title: const Text('Modifica bonifico'),
+            leading: IconButton(
+              tooltip: 'Indietro',
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => DiscardGuard.back(context),
+            ),
+          ),
+          body: missing
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: EmptyState(
+                    message: 'Bonifico non trovato: forse è stato eliminato. '
+                        'Lo trovi nel Cestino, in Altro.',
+                  ),
+                )
+              : const Center(child: CircularProgressIndicator()),
+        );
+      }
+      _existing = found;
+      _defaultsApplied = true;
+      _fromLaura = ref
+              .read(authSessionProvider)
+              .valueOrNull
+              ?.household
+              ?.isLauUid(found.fromUid) ??
+          true;
+      _amountCtrl.text =
+          MoneyFormat.fromCents(found.amountCents).replaceFirst('€', '').trim();
+      _noteCtrl.text = found.note ?? '';
+      _date = found.date;
+    }
     if (!_defaultsApplied &&
         !_dirty &&
         expensesAsync.hasValue &&
@@ -75,13 +122,16 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
       });
     }
 
-    return Scaffold(
+    return DiscardGuard(
+      isDirty: () => _dirty,
+      child: Scaffold(
         backgroundColor: c.bg,
         appBar: AppBar(
-          title: const Text('Registra bonifico'),
+          title: Text(_isEdit ? 'Modifica bonifico' : 'Registra bonifico'),
           leading: IconButton(
+            tooltip: 'Indietro',
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+            onPressed: () => DiscardGuard.back(context),
           ),
         ),
         bottomNavigationBar: Material(
@@ -94,7 +144,9 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
               12 + MediaQuery.viewPaddingOf(context).bottom,
             ),
             child: PrimaryButton(
-              label: _busy ? 'Salvataggio…' : 'Registra bonifico',
+              label: _busy
+                  ? 'Salvataggio…'
+                  : (_isEdit ? 'Salva bonifico' : 'Registra bonifico'),
               onPressed: _busy ? null : _save,
             ),
           ),
@@ -102,8 +154,10 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            _SettleHintCard(snap: snap),
-            const SizedBox(height: 18),
+            if (!_isEdit) ...[
+              _SettleHintCard(snap: snap),
+              const SizedBox(height: 18),
+            ],
             _FieldLabel('Chi manda i soldi'),
             const SizedBox(height: 8),
             _DirectionPicker(
@@ -172,6 +226,7 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
             ),
           ],
         ),
+      ),
     );
   }
 
@@ -179,7 +234,12 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
     final session = ref.read(authSessionProvider).valueOrNull;
     final user = session?.user;
     final household = session?.household;
-    if (user == null || household == null) return;
+    if (user == null || household == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessione non pronta: riprova tra un attimo.')),
+      );
+      return;
+    }
 
     final fromUid = _fromLaura ? household.lauUid : household.robUid;
     final toUid = _fromLaura ? household.robUid : household.lauUid;
@@ -198,12 +258,16 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
     try {
       await ref.read(transferRepositoryProvider).save(
             draft: Transfer(
-              id: '',
+              id: _existing?.id ?? '',
               fromUid: fromUid,
               toUid: toUid,
               amountCents: _amountCents,
               date: _date,
               note: _noteCtrl.text,
+              source: _existing?.source ?? 'app',
+              importRow: _existing?.importRow,
+              createdBy: _existing?.createdBy,
+              createdAt: _existing?.createdAt,
             ),
             actorUid: user.uid,
           );
@@ -220,7 +284,12 @@ class _TransferFormPageState extends ConsumerState<TransferFormPage> {
       _busy = false;
       _dirty = false;
     });
-    context.go('/');
+    // Back to where the form was opened from (Home or the Bonifici list).
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
+    }
   }
 }
 

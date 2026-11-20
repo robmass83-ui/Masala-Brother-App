@@ -60,7 +60,11 @@ class HomePage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
         physics: const ClampingScrollPhysics(),
         children: [
-          _HeroBalance(colors: c, snap: balance),
+          _HeroBalance(
+              colors: c,
+              snap: balance,
+              readiness: ref.watch(balanceReadinessProvider),
+            ),
           const SizedBox(height: 6),
           _PaidRow(paidRob: balance.paidRobCents, paidLau: balance.paidLauCents),
           const SizedBox(height: 6),
@@ -329,7 +333,11 @@ class _OpenTaskCard extends StatelessWidget {
 }
 
 class _HeroBalance extends StatelessWidget {
-  const _HeroBalance({required this.colors, required this.snap});
+  const _HeroBalance({
+    required this.colors,
+    required this.snap,
+    this.readiness = BalanceReadiness.ready,
+  });
 
   /// Penny's box sits on the button, measured from the card's bottom edge.
   static const double _pennyBottomOnButton = 15;
@@ -339,9 +347,11 @@ class _HeroBalance extends StatelessWidget {
 
   final AppColors colors;
   final BalanceSnapshot snap;
+  final BalanceReadiness readiness;
 
   @override
   Widget build(BuildContext context) {
+    final ready = readiness == BalanceReadiness.ready;
     final even = snap.isEven;
     final penny = PennySession.showPenny;
     return Container(
@@ -369,9 +379,13 @@ class _HeroBalance extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 86),
                 child: Text(
-                  even
-                      ? 'Siete in pari'
-                      : MoneyFormat.fromCents(snap.absoluteCreditCents),
+                  switch (readiness) {
+                    BalanceReadiness.loading => 'Calcolo…',
+                    BalanceReadiness.failed => 'Saldo non disponibile',
+                    BalanceReadiness.ready => even
+                        ? 'Siete in pari'
+                        : MoneyFormat.fromCents(snap.absoluteCreditCents),
+                  },
                   style: TextStyle(
                     color: colors.heroFg,
                     fontSize: 26,
@@ -381,7 +395,7 @@ class _HeroBalance extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!even) ...[
+              if (ready && !even) ...[
                 const SizedBox(height: 4),
                 Padding(
                   padding: const EdgeInsets.only(right: 86),
@@ -441,7 +455,7 @@ class _HeroBalance extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: colors.acc,
                     foregroundColor: colors.onAcc,
-                    minimumSize: const Size.fromHeight(38),
+                    minimumSize: const Size.fromHeight(44),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(vertical: 6),

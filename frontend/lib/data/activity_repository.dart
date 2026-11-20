@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
 import 'activity_models.dart';
+import 'local_first.dart';
 
 class ActivityRepository {
   ActivityRepository({FirebaseFirestore? firestore}) : _db = firestore;
@@ -62,7 +63,7 @@ class ActivityRepository {
       _memoryCtrl.add(_sorted());
       return entry;
     }
-    await _col.doc(id).set(entry.toMap());
+    fireAndForget(_col.doc(id).set(entry.toMap()));
     return entry;
   }
 

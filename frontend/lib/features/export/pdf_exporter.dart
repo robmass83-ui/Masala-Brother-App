@@ -38,12 +38,12 @@ class PdfExporter {
     );
 
     pw.Widget heading(String text) => pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 12, bottom: 8),
-          child: pw.Text(
-            text,
-            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
-          ),
-        );
+      padding: const pw.EdgeInsets.only(top: 12, bottom: 8),
+      child: pw.Text(
+        pdfSafe(text),
+        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+      ),
+    );
 
     String propName(String? id) {
       if (id == null || id.isEmpty) return '-';
@@ -63,15 +63,18 @@ class PdfExporter {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'Rendiconto spese Laura e Roberto',
+                pdfSafe('Rendiconto spese Laura e Roberto'),
                 style: pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
               pw.Text(
-                periodLabel,
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                pdfSafe(periodLabel),
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
               ),
             ],
           ),
@@ -79,7 +82,7 @@ class PdfExporter {
         footer: (ctx) => pw.Align(
           alignment: pw.Alignment.centerRight,
           child: pw.Text(
-            'Pagina ${ctx.pageNumber} / ${ctx.pagesCount}',
+            pdfSafe('Pagina ${ctx.pageNumber} / ${ctx.pagesCount}'),
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
           ),
         ),
@@ -99,7 +102,7 @@ class PdfExporter {
             children.add(
               snapshot.transfers.isEmpty
                   ? pw.Text(
-                      'Nessun bonifico nel periodo.',
+                      pdfSafe('Nessun bonifico nel periodo.'),
                       style: const pw.TextStyle(fontSize: 10),
                     )
                   : _transfersTable(
@@ -116,7 +119,7 @@ class PdfExporter {
             children.add(
               open.isEmpty
                   ? pw.Text(
-                      'Nessuna cosa da fare aperta.',
+                      pdfSafe('Nessuna cosa da fare aperta.'),
                       style: const pw.TextStyle(fontSize: 10),
                     )
                   : _tasksTable(
@@ -137,21 +140,20 @@ class PdfExporter {
             }).toList();
             if (items.isEmpty) continue;
             children.add(heading('Immobile · ${group.name}'));
-            children.add(
-              _expensesTable(items),
-            );
+            children.add(_expensesTable(items));
           }
 
           for (final group in snapshot.byCategory) {
             final items = snapshot.expenses
-                .where((e) =>
-                    (e.categoryId.isEmpty ? 'altro' : e.categoryId) == group.id)
+                .where(
+                  (e) =>
+                      (e.categoryId.isEmpty ? 'altro' : e.categoryId) ==
+                      group.id,
+                )
                 .toList();
             if (items.isEmpty) continue;
             children.add(heading('Categoria · ${group.name}'));
-            children.add(
-              _expensesTable(items),
-            );
+            children.add(_expensesTable(items));
           }
 
           return children;
@@ -166,8 +168,8 @@ class PdfExporter {
     final phrase = snap.isEven
         ? 'Siete in pari'
         : snap.lauraOwesRoberto
-            ? 'che Laura deve a Roberto'
-            : 'che Roberto deve a Laura';
+        ? 'che Laura deve a Roberto'
+        : 'che Roberto deve a Laura';
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.all(12),
@@ -179,20 +181,22 @@ class PdfExporter {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            'Saldo del periodo',
+            pdfSafe('Saldo del periodo'),
             style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            MoneyFormat.fromCentsPdf(snap.absoluteCreditCents),
+            pdfSafe(MoneyFormat.fromCentsPdf(snap.absoluteCreditCents)),
             style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
           ),
-          pw.Text(phrase, style: const pw.TextStyle(fontSize: 11)),
+          pw.Text(pdfSafe(phrase), style: const pw.TextStyle(fontSize: 11)),
           pw.SizedBox(height: 8),
           pw.Text(
-            'Roberto ${MoneyFormat.fromCentsPdf(snap.paidRobCents)}   ·   '
-            'Laura ${MoneyFormat.fromCentsPdf(snap.paidLauCents)}   ·   '
-            'Spese ${MoneyFormat.fromCentsPdf(snap.totalDueCents)}',
+            pdfSafe(
+              'Roberto ${MoneyFormat.fromCentsPdf(snap.paidRobCents)}   ·   '
+              'Laura ${MoneyFormat.fromCentsPdf(snap.paidLauCents)}   ·   '
+              'Spese ${MoneyFormat.fromCentsPdf(snap.totalDueCents)}',
+            ),
             style: const pw.TextStyle(fontSize: 10),
           ),
         ],
@@ -203,7 +207,7 @@ class PdfExporter {
   pw.Widget _expensesTable(List<Expense> expenses) {
     if (expenses.isEmpty) {
       return pw.Text(
-        'Nessuna spesa nel periodo.',
+        pdfSafe('Nessuna spesa nel periodo.'),
         style: const pw.TextStyle(fontSize: 10),
       );
     }
@@ -244,7 +248,7 @@ class PdfExporter {
       data: [
         for (final e in expenses)
           [
-            e.description,
+            pdfSafe(e.description),
             AppDateFormat.format(e.date),
             MoneyFormat.fromCentsPdf(e.amountDueCents),
             MoneyFormat.fromCentsPdf(e.paidRobCents),
@@ -265,7 +269,10 @@ class PdfExporter {
 
   pw.Widget _namedBars(List<NamedAmount> items, int maxCents) {
     if (items.isEmpty) {
-      return pw.Text('Nessun dato.', style: const pw.TextStyle(fontSize: 10));
+      return pw.Text(
+        pdfSafe('Nessun dato.'),
+        style: const pw.TextStyle(fontSize: 10),
+      );
     }
     return pw.Column(
       children: [
@@ -280,12 +287,12 @@ class PdfExporter {
                   children: [
                     pw.Expanded(
                       child: pw.Text(
-                        item.name,
+                        pdfSafe(item.name),
                         style: const pw.TextStyle(fontSize: 10),
                       ),
                     ),
                     pw.Text(
-                      MoneyFormat.fromCentsPdf(item.amountCents),
+                      pdfSafe(MoneyFormat.fromCentsPdf(item.amountCents)),
                       style: pw.TextStyle(
                         fontSize: 10,
                         fontWeight: pw.FontWeight.bold,
@@ -328,7 +335,7 @@ class PdfExporter {
                 ? 'Laura'
                 : 'Roberto',
             MoneyFormat.fromCentsPdf(t.amountCents),
-            t.note ?? '',
+            pdfSafe(t.note ?? ''),
           ],
       ],
     );
@@ -348,16 +355,58 @@ class PdfExporter {
       data: [
         for (final t in tasks)
           [
-            t.title,
+            pdfSafe(t.title),
             t.dueDate == null ? '-' : AppDateFormat.format(t.dueDate!),
             t.assigneeUid == null || t.assigneeUid!.isEmpty
                 ? 'Chiunque'
-                : (PersonUid.isLau(t.assigneeUid!, robUid: robUid, lauUid: lauUid)
-                    ? 'Laura'
-                    : 'Roberto'),
-            propertyName(t.propertyId),
+                : (PersonUid.isLau(
+                        t.assigneeUid!,
+                        robUid: robUid,
+                        lauUid: lauUid,
+                      )
+                      ? 'Laura'
+                      : 'Roberto'),
+            pdfSafe(propertyName(t.propertyId)),
           ],
       ],
     );
   }
+}
+
+/// The PDF uses the built-in Helvetica, which only has Latin-1 glyphs:
+/// typographic quotes, dashes, the euro sign or emoji typed on a phone
+/// would render as boxes (or stop the export). Map them to plain look-alikes.
+String pdfSafe(String text) {
+  const map = {
+    '‘': "'",
+    '’': "'",
+    '‚': "'",
+    '‛': "'",
+    '“': '"',
+    '”': '"',
+    '„': '"',
+    '–': '-',
+    '—': '-',
+    '−': '-',
+    '…': '...',
+    '€': 'EUR',
+    '•': '-',
+    ' ': ' ',
+    ' ': ' ',
+    '→': '->',
+  };
+  final b = StringBuffer();
+  for (final rune in text.runes) {
+    final ch = String.fromCharCode(rune);
+    if (map.containsKey(ch)) {
+      b.write(map[ch]);
+    } else if (rune <= 0xff) {
+      b.write(ch);
+    } else if (rune >= 0xfe00 && rune <= 0xfe0f || rune == 0x200d) {
+      // Emoji modifiers: drop.
+    } else {
+      b.write('?');
+    }
+  }
+  return b.toString();
 }

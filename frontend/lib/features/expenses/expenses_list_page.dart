@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/utils/money_format.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/person_avatar.dart';
@@ -234,8 +235,12 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
 
   Future<void> _delete(Expense e, String uid) async {
     final repo = ref.read(expenseRepositoryProvider);
-    await repo.softDelete(e.id, uid);
-    if (!mounted) return;
+    final ok = await guardedAction(
+      context,
+      () => repo.softDelete(e.id, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!ok || !mounted) return;
     showUndoSnackBar(
       context,
       message: 'Spesa eliminata',
@@ -252,15 +257,20 @@ class _ExpensesListPageState extends ConsumerState<ExpensesListPage> {
     );
     if (draft == null) return;
     final repo = ref.read(expenseRepositoryProvider);
-    await repo.addPayments(
-      expense: e,
-      parts: [
-        for (final p in draft.parts)
-          (payerUid: p.payerUid, amountCents: p.amountCents),
-      ],
-      actorUid: uid,
-      robUid: household.robUid,
-      lauUid: household.lauUid,
+    if (!mounted) return;
+    await guardedAction(
+      context,
+      () => repo.addPayments(
+        expense: e,
+        parts: [
+          for (final p in draft.parts)
+            (payerUid: p.payerUid, amountCents: p.amountCents),
+        ],
+        actorUid: uid,
+        robUid: household.robUid,
+        lauUid: household.lauUid,
+      ),
+      failure: 'Pagamento non salvato. Riprova.',
     );
   }
 }
@@ -331,7 +341,8 @@ class _Chip extends StatelessWidget {
             customBorder: const StadiumBorder(),
             onTap: onTap,
             child: Container(
-              height: 36,
+              height: 40,
+              constraints: const BoxConstraints(minWidth: 48),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               child: Center(
@@ -464,6 +475,10 @@ class _ExpenseRow extends StatelessWidget {
 
     return Dismissible(
       key: ValueKey(expense.id),
+      // A paid expense has nothing left to pay: only "Elimina" swipes.
+      direction: expense.status == ExpenseStatus.pagato || onMarkPaid == null
+          ? DismissDirection.endToStart
+          : DismissDirection.horizontal,
       background: _SwipeBg(
         color: c.okSoft,
         align: Alignment.centerLeft,

@@ -27,8 +27,11 @@ class BalanceCalculator {
       final paidTotal = e.paidRobCents + e.paidLauCents;
       if (paidTotal == 0) continue;
       if (e.shareRobPct != 50) usedCustomShare = true;
-      final robShareOfPaid =
-          _percentOf(paidTotal, e.shareRobPct.clamp(0, 100));
+      final robShareOfPaid = _robShare(
+        paidTotal,
+        e.shareRobPct.clamp(0, 100),
+        lauPaidMore: e.paidLauCents > e.paidRobCents,
+      );
       creditRob += e.paidRobCents - robShareOfPaid;
     }
 
@@ -73,10 +76,14 @@ class BalanceCalculator {
     );
   }
 
-  /// `(total * pct) / 100`. For odd remainders when pct=50, the extra cent
-  /// stays with whoever paid more on that expense (truncation toward zero
-  /// on share, so payer of the odd cent keeps credit).
-  static int _percentOf(int total, int pct) => (total * pct) ~/ 100;
+  /// Roberto's share of [total] at [pct]%. When it isn't a whole cent, the
+  /// odd cent of credit stays with whoever paid more on that expense:
+  /// Roberto's share rounds down if he paid more, up if Laura did.
+  static int _robShare(int total, int pct, {required bool lauPaidMore}) {
+    final exact = total * pct;
+    final floor = exact ~/ 100;
+    return (exact % 100 != 0 && lauPaidMore) ? floor + 1 : floor;
+  }
 
   /// Half of [diff] cents; if [diff] is odd the extra cent stays with the
   /// person who paid more (positive → Roberto, negative → Laura).

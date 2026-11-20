@@ -6,6 +6,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/chip_wrap.dart';
+import '../../core/widgets/discard_guard.dart';
+import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/guarded_action.dart';
 import '../../core/widgets/person_avatar.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/data_providers.dart';
@@ -40,6 +43,32 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
   HouseholdTask? _existing;
 
   bool get _isEdit => widget.id != null;
+  Object? _initial;
+
+  Object _snapshot() => (
+        _titleCtrl.text,
+        _assignee,
+        _dueDate,
+        _reminderDays,
+        _propertyId,
+        _listId,
+        _createExpense,
+      );
+
+  bool _isDirty() => _initial != null && _snapshot() != _initial;
+
+  /// The day the reminder would fire, or null without one.
+  static DateTime? _reminderDay(DateTime? due, int? days) {
+    if (due == null || days == null) return null;
+    final d = DateTime(due.year, due.month, due.day);
+    return d.subtract(Duration(days: days));
+  }
+
+  static bool _isPast(DateTime? day) {
+    if (day == null) return false;
+    final now = DateTime.now();
+    return day.isBefore(DateTime(now.year, now.month, now.day));
+  }
 
   @override
   void initState() {
@@ -77,20 +106,51 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
     final props =
         ref.watch(propertiesProvider).valueOrNull ?? const <CatalogProperty>[];
     if (_isEdit) {
-      final existing = ref.watch(taskProvider(widget.id!)).valueOrNull;
+      final async = ref.watch(taskProvider(widget.id!));
+      final existing = async.valueOrNull;
       if (existing != null && !_loaded) {
         _fillFrom(existing);
         _loaded = true;
       }
+      // Not loaded yet, or gone (e.g. opened from an old reminder): never
+      // show an empty form whose save would overwrite the task.
+      if (!_loaded) {
+        final missing = !async.isLoading;
+        return Scaffold(
+          backgroundColor: c.bg,
+          appBar: AppBar(
+            title: const Text('Modifica'),
+            leading: IconButton(
+              tooltip: 'Indietro',
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => DiscardGuard.back(context),
+            ),
+          ),
+          body: missing
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: EmptyState(
+                    message: 'Questa cosa da fare non c’è più: forse è stata '
+                        'eliminata. La trovi nel Cestino, in Altro.',
+                  ),
+                )
+              : const Center(child: CircularProgressIndicator()),
+        );
+      }
     }
+    _initial ??= _snapshot();
+    final reminderPast = _isPast(_reminderDay(_dueDate, _reminderDays));
 
-    return Scaffold(
+    return DiscardGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       backgroundColor: c.bg,
       appBar: AppBar(
         title: Text(_isEdit ? 'Modifica' : 'Nuova cosa da fare'),
         leading: IconButton(
+          tooltip: 'Indietro',
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => DiscardGuard.back(context),
         ),
         actions: [
           if (_isEdit)
@@ -100,7 +160,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
             )
           else
             TextButton(
-              onPressed: () => context.pop(),
+              onPressed: () => DiscardGuard.back(context),
               child: Text('Annulla', style: TextStyle(color: c.ink3)),
             ),
         ],
@@ -264,6 +324,13 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
               ),
             ],
           ),
+          if (reminderPast) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Il giorno del promemoria è già passato: non arriverà nessun avviso.',
+              style: TextStyle(color: c.due, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ],
           const SizedBox(height: 18),
           _FieldLabel('Collegata a'),
           const SizedBox(height: 8),
@@ -354,6 +421,7 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
           ],
         ],
       ),
+      ),
     );
   }
 
@@ -386,14 +454,17 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
       builder: (ctx) {
         Widget option(String label, int? days) {
           final selected = days == _reminderDays;
+          final past = _isPast(_reminderDay(_dueDate, days));
           return ListTile(
+            enabled: !past,
             title: Text(
               label,
               style: TextStyle(
-                color: selected ? c.acc : c.ink,
+                color: past ? c.ink3 : (selected ? c.acc : c.ink),
                 fontWeight: FontWeight.w700,
               ),
             ),
+            subtitle: past ? const Text('Già passato') : null,
             onTap: () => Navigator.pop(ctx, days ?? 'none'),
           );
         }
@@ -433,26 +504,63 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
     final session = ref.read(authSessionProvider).valueOrNull;
     final user = session?.user;
     final household = session?.household;
-    if (user == null || household == null) return;
+    if (user == null || household == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sessione non pronta: riprova tra un attimo.')),
+      );
+      return;
+    }
+
+    final lists = ref.read(visibleTaskListsProvider);
+    TaskList? selectedList;
+    for (final l in lists) {
+      if (l.id == _listId) {
+        selectedList = l;
+        break;
+      }
+    }
+    // The task's list was deleted (or isn't loaded yet): keep the task where
+    // it was, private if it was private, instead of silently sharing it.
+    final keepOldList = selectedList == null &&
+        _listId != null &&
+        _listId == _existing?.listId;
+    final listId = keepOldList ? _existing!.listId : selectedList?.id;
+    final listOwnerUid =
+        keepOldList ? _existing!.listOwnerUid : selectedList?.ownerUid;
+
+    final assigneeUid = switch (_assignee) {
+      _Assignee.rob => household.robUid,
+      _Assignee.lau => household.lauUid,
+      _Assignee.anyone => null,
+    };
+    if (listOwnerUid != null &&
+        assigneeUid != null &&
+        assigneeUid != listOwnerUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Questa lista la vedi solo tu: l’altra persona non vedrebbe la cosa '
+            'da fare. Scegli te o “Chiunque”, oppure una lista condivisa.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() => _busy = true);
     try {
-      final assigneeUid = switch (_assignee) {
-        _Assignee.rob => household.robUid,
-        _Assignee.lau => household.lauUid,
-        _Assignee.anyone => null,
-      };
-
-      final lists = ref.read(visibleTaskListsProvider);
-      TaskList? selectedList;
-      for (final l in lists) {
-        if (l.id == _listId) {
-          selectedList = l;
-          break;
-        }
+      final repo = ref.read(taskRepositoryProvider);
+      // Fields this form doesn't edit (done, linked expense) come from the
+      // latest version, so a change made meanwhile by the other person
+      // isn't reverted.
+      final latest =
+          widget.id == null ? null : await repo.watchTask(widget.id!).first;
+      if (widget.id != null && latest == null) {
+        throw StateError('La cosa da fare è stata eliminata.');
       }
+      final base = latest ?? _existing;
 
-      final saved = await ref.read(taskRepositoryProvider).save(
+      final saved = await repo.save(
             draft: HouseholdTask(
               id: widget.id ?? '',
               title: _titleCtrl.text.trim(),
@@ -460,15 +568,15 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
               dueDate: _dueDate,
               reminderDaysBefore: _dueDate == null ? null : _reminderDays,
               propertyId: _propertyId,
-              linkedExpenseId: _existing?.linkedExpenseId,
+              linkedExpenseId: base?.linkedExpenseId,
               createExpenseOnDone: _createExpense,
-              done: _existing?.done ?? false,
-              doneAt: _existing?.doneAt,
-              doneBy: _existing?.doneBy,
-              listId: selectedList?.id,
-              listOwnerUid: selectedList?.ownerUid,
-              createdBy: _existing?.createdBy,
-              createdAt: _existing?.createdAt,
+              done: base?.done ?? false,
+              doneAt: base?.doneAt,
+              doneBy: base?.doneBy,
+              listId: listId,
+              listOwnerUid: listOwnerUid,
+              createdBy: base?.createdBy,
+              createdAt: base?.createdAt,
             ),
             actorUid: user.uid,
           );
@@ -529,9 +637,26 @@ class _TaskFormPageState extends ConsumerState<TaskFormPage> {
       ),
     );
     if (ok != true || !mounted) return;
-    await ref.read(taskRepositoryProvider).softDelete(id, uid);
-    if (!mounted) return;
+    final repo = ref.read(taskRepositoryProvider);
+    final deleted = await guardedAction(
+      context,
+      () => repo.softDelete(id, uid),
+      failure: 'Eliminazione non riuscita. Riprova.',
+    );
+    if (!deleted || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     context.pop();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Cosa da fare eliminata'),
+          action: SnackBarAction(
+            label: 'Annulla',
+            onPressed: () => repo.restore(id, uid),
+          ),
+        ),
+      );
   }
 }
 

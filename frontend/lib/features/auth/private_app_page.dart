@@ -14,6 +14,7 @@ class PrivateAppPage extends ConsumerWidget {
     final c = context.colors;
     final session = ref.watch(authSessionProvider).valueOrNull;
     final email = session?.user?.email ?? '';
+    final retryable = session?.retryable ?? false;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -24,7 +25,7 @@ class PrivateAppPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Questa app è privata',
+                retryable ? 'Connessione non riuscita' : 'Questa app è privata',
                 style: TextStyle(
                   color: c.ink,
                   fontSize: 28,
@@ -33,9 +34,12 @@ class PrivateAppPage extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                email.isEmpty
-                    ? 'Il tuo account Google non è autorizzato.'
-                    : 'L’account $email non è nella lista dei partecipanti.',
+                retryable
+                    ? 'Non sono riuscito a controllare il tuo account. '
+                        'Verifica di essere online e riprova.'
+                    : email.isEmpty
+                        ? 'Il tuo account Google non è autorizzato.'
+                        : 'L’account $email non è nella lista dei partecipanti.',
                 style: TextStyle(
                   color: c.ink2,
                   fontSize: 15,
@@ -58,6 +62,13 @@ class PrivateAppPage extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
+              if (retryable) ...[
+                PrimaryButton(
+                  label: 'Riprova',
+                  onPressed: () => ref.invalidate(authSessionProvider),
+                ),
+                const SizedBox(height: 10),
+              ],
               PrimaryButton(
                 label: 'Esci',
                 onPressed: () => ref.read(authRepositoryProvider).signOut(),

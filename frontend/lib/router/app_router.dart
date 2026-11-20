@@ -7,7 +7,6 @@ import '../features/auth/auth_models.dart';
 import '../features/auth/auth_providers.dart';
 import '../features/auth/boot_page.dart';
 import '../features/auth/private_app_page.dart';
-import '../features/common/placeholder_page.dart';
 import '../features/export/export_page.dart';
 import '../features/home/home_page.dart';
 import '../features/report/report_page.dart';
@@ -210,6 +209,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'nuovo',
             builder: (context, state) => const TransferFormPage(),
           ),
+          GoRoute(
+            path: ':id',
+            builder: (context, state) =>
+                TransferFormPage(id: state.pathParameters['id']),
+          ),
         ],
       ),
       GoRoute(
@@ -226,11 +230,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/importa',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ImportExcelPage(),
-      ),
-      GoRoute(
-        path: '/placeholder',
-        builder: (context, state) =>
-            const PlaceholderPage(title: 'Placeholder'),
       ),
     ],
   );

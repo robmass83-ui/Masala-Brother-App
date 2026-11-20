@@ -40,7 +40,7 @@ class AppUpdater {
         'Accept': 'application/vnd.github+json',
         'User-Agent': _userAgent,
       },
-    );
+    ).timeout(const Duration(seconds: 20));
     if (res.statusCode == 404) {
       throw const AppUpdateException(
         'Nessuna release trovata. Serve un tag GitHub (es. v1.0.1) con l’APK, '
@@ -173,7 +173,7 @@ class AppUpdater {
     final file = File('${dir.path}/${update.apkName}');
     final req = http.Request('GET', Uri.parse(update.apkUrl));
     req.headers['User-Agent'] = _userAgent;
-    final res = await _client.send(req);
+    final res = await _client.send(req).timeout(const Duration(seconds: 30));
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw AppUpdateException('Download non riuscito (${res.statusCode}).');
     }

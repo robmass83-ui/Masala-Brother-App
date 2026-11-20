@@ -15,7 +15,6 @@ import '../../data/data_providers.dart';
 import '../../data/expense_models.dart';
 import '../auth/auth_models.dart';
 import '../auth/auth_providers.dart';
-import '../common/placeholder_page.dart';
 import 'settings_tiles.dart';
 import 'update_flow.dart';
 
@@ -29,10 +28,8 @@ class SettingsPage extends ConsumerWidget {
     final user = session?.user;
 
     if (user == null) {
-      return const PlaceholderPage(
-        title: 'Altro',
-        subtitle: 'Impostazioni e dati',
-      );
+      // Session still loading: a spinner, not a fake demo screen.
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final household = session?.household;

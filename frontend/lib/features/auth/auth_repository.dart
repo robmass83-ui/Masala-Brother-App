@@ -241,6 +241,9 @@ class AuthRepository {
         status: AuthStatus.unauthorized,
         user: appUser,
         message: e.message,
+        // Only a rules rejection means "not a member"; anything else
+        // (offline, timeout) is temporary and must not lock anyone out.
+        retryable: e.code != 'permission-denied',
       );
     }
   }

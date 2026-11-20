@@ -116,6 +116,7 @@ class AuthSession {
     this.user,
     this.household,
     this.message,
+    this.retryable = false,
   });
 
   const AuthSession.unknown() : this(status: AuthStatus.unknown);
@@ -125,6 +126,10 @@ class AuthSession {
   final AppUser? user;
   final Household? household;
   final String? message;
+
+  /// The check failed for a temporary reason (no connection, server busy),
+  /// not because the account is not a member: offer "Riprova".
+  final bool retryable;
 
   bool get isAuthorized => status == AuthStatus.authorized;
 }
